@@ -25,7 +25,6 @@ lazy val root = (project in file(".")).
         "-deprecation", "-unchecked", "-feature",
         // https://docs.scala-lang.org/overviews/compiler-options/index.html
         "-Xlint:nullary-unit",     // warn when methods without parentheses return Unit
-        "-Xlint:nullary-override", // warn when methods without parentheses are overridden by methods with parentheses
         "-Xlint:infer-any",        // warn when a type argument is inferred to be `Any` (probably a mistake!)
         "-Xlint:unused",           // warn when something has been unused (suppress with `@unused` annotation)
         "-Xlint:nonlocal-return",  // warn when a return statement used an exception for control flow
