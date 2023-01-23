@@ -6,24 +6,23 @@ import parsley.expr.chain
 import parsley.implicits.character.charLift
 
 object Main {
-    def main(args: Array[String]): Unit = {
-        println("Hello WACC_33!")
+  def main(args: Array[String]): Unit = {
+    println("Hello WACC_33!")
 
-        lazy val integer = digit.foldLeft1[BigInt](0)((n, d) => n * 10 + d.asDigit)
+    lazy val integer = digit.foldLeft1[BigInt](0)((n, d) => n * 10 + d.asDigit)
 
-        val add = (x: BigInt, y: BigInt) => x + y
-        val sub = (x: BigInt, y: BigInt) => x - y
+               val add = (x: BigInt, y: BigInt) => x + y
+    val sub = (x: BigInt, y: BigInt) => x - y
 
-        lazy val expr: Parsley[BigInt] =
-            chain.left1[BigInt](
-                ('(' ~> expr <~ ')') <|> integer,
-                ('+' #> add) <|> ('-' #> sub)
-            )
+    lazy val expr: Parsley[BigInt] =
+      chain.left1[BigInt](
+        ('(' ~> expr <~ ')') <|> integer,
+        ('+' #> add) <|> ('-' #> sub)
+      )
 
-        expr.parse(args.head) match {
-            case Success(x) => println(s"${args.head} = $x")
-            case Failure(msg) => println(msg)
-        }
+    expr.parse(args.head) match {
+      case Success(x)   => println(s"${args.head} = $x")
+      case Failure(msg) => println(msg)
     }
+  }
 }
-
