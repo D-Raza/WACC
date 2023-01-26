@@ -3,7 +3,7 @@ all: format test build
 format:
 	sbt scalafmtAll
 
-test:
+test: build
 	bash test.sh
 
 build:
