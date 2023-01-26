@@ -63,5 +63,6 @@ project/**/metals.sbt
 # jarfile
 wacc-33-compiler.jar
 
-# test output
+# test script files
+/wacc_examples
 test.log
