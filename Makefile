@@ -1,15 +1,15 @@
-all: format build
+all: format test build
 
 format:
 	sbt scalafmtAll
 
-build:
-	sbt compile assembly 
-
 test:
 	bash test.sh
 
+build:
+	sbt compile assembly 
+
 clean:
-	sbt clean && rm -rf wacc-33-compiler.jar
+	sbt clean && rm -rf wacc_examples/ wacc-33-compiler.jar
 
 .PHONY: all format compile clean 
