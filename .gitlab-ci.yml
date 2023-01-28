@@ -1,0 +1,20 @@
+image: sbtscala/scala-sbt:eclipse-temurin-focal-17.0.5_8_1.8.2_2.13.10
+stages:
+  - lint
+  - build
+  - test
+
+lint-job:
+  stage: lint
+  script:
+    - make lint
+
+build-job:
+  stage: build
+  script:
+    - make build
+
+test-job:
+  stage: test-success
+  script:
+    - make check
