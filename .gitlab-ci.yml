@@ -1,4 +1,9 @@
 image: sbtscala/scala-sbt:eclipse-temurin-focal-17.0.5_8_1.8.2_2.13.10
+
+.install_dependencies:
+  before_script:
+    - apt-get install -y make
+
 stages:
   - lint
   - build
