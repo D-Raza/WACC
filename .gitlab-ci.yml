@@ -15,6 +15,6 @@ build-job:
     - make build
 
 test-job:
-  stage: test-success
+  stage: test
   script:
     - make check
