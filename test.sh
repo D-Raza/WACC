@@ -44,7 +44,8 @@ do
         expected_exit_code=$(awk '/# Exit:/{getline; print}' $file | grep -o '[0-9]\+')
     fi 
 
-    result_exit_code=$(./compile "$file" | awk 'IGNORECASE=1; /[(]exit code[)]/{print $3}' $output | grep -o '[0-9]\+')
+    output=$(./compile "$file")
+    result_exit_code=$?
 
     if [ $expected_exit_code -eq $result_exit_code ]; then
         echo -e "  \e[1;32m[PASS]\e[0m \e[32m$file\e[0m"

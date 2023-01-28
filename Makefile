@@ -1,15 +1,17 @@
-all: format test build
+milestone := "calc_examples"
 
-format:
-	sbt scalafmtAll
-
-test: build
-	bash test.sh
+all: build
 
 build:
 	sbt compile assembly 
 
-clean:
-	sbt clean && rm -rf wacc_examples/ wacc-33-compiler.jar
+check: build
+	bash test.sh $(milestone)
 
-.PHONY: all format compile clean 
+format:
+	sbt scalafmtAll
+
+clean:
+	sbt clean && rm -rf wacc_examples/ wacc-33-compiler.jar test.log
+
+.PHONY: all build check format clean 
