@@ -11,15 +11,18 @@ stages:
 
 lint-job:
   stage: lint
+  extends: .install_dependencies
   script:
     - make lint
 
 build-job:
   stage: build
+  extends: .install_dependencies
   script:
     - make build
 
 test-job:
   stage: test
+  extends: .install_dependencies
   script:
     - make check
