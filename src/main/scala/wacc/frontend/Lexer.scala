@@ -1,17 +1,24 @@
 package wacc.frontend
 
 import parsley.Parsley
+import Parsley._
+import parsley.implicits.character.stringLift
+import parsley.errors.combinator.ErrorMethods
 import parsley.token.Lexer
+import parsley.token.descriptions.LexicalDesc
+import parsley.token.descriptions.NameDesc
+import parsley.token.descriptions.SpaceDesc
+import parsley.token.descriptions.SymbolDesc
+import parsley.token.descriptions.numeric.ExponentDesc
+import parsley.token.descriptions.numeric.NumericDesc
+import parsley.token.descriptions.text.EscapeDesc
+import parsley.token.descriptions.text.TextDesc
 import parsley.token.predicate.Basic
-import parsley.token.descriptions.{LexicalDesc, NameDesc, SymbolDesc, SpaceDesc}
-import parsley.token.descriptions.numeric.{NumericDesc, ExponentDesc}
-import parsley.token.descriptions.text.{TextDesc, EscapeDesc}
 
 object Lexer {
   private val waccDesc = LexicalDesc.plain.copy(
     spaceDesc = SpaceDesc.plain.copy(
       commentLine = "#",
-      space = Basic(c => c.isWhitespace)
     ),
     symbolDesc = SymbolDesc.plain.copy(
       hardKeywords = Set(
@@ -65,9 +72,8 @@ object Lexer {
         "==",
         "!=",
         "&&",
-        "||"
+        "||",
       ),
-      caseSensitive = true
     ),
     nameDesc = NameDesc.plain.copy(
       identifierStart = Basic(c => Character.isLetter(c) || c == '_'),
@@ -95,11 +101,21 @@ object Lexer {
         )
       ),
       graphicCharacter = Basic(c =>
-        c != '"' && c != '\'' && c != '\\' && c.toInt >= ' '.toInt && c.toInt <= '~'.toInt
+        c >= ' ' && !Set('\\', '\'', '\"').contains(c)
       )
     )
   )
   private val lexer = new Lexer(waccDesc)
 
+  val VAR_ID: Parsley[String] = lexer.lexeme.names.identifier
+  
+  val INTEGER: Parsley[Int] = lexer.lexeme.numeric.integer.decimal32.label("integer")
+  val BOOL: Parsley[Boolean] = lexer.lexeme(attempt("true" #> true <|> "false" #> false)).label("boolean")
+  val STRING: Parsley[String] = lexer.lexeme.text.string.ascii.label("string literal")
+  val CHAR: Parsley[Char] = lexer.lexeme.text.character.ascii.label("char literal")
+
   def fully[A](p: Parsley[A]): Parsley[A] = lexer.fully(p)
+
+  val implicits = lexer.lexeme.symbol.implicits
+
 }
