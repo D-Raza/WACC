@@ -17,7 +17,7 @@ lazy val root = (project in file(".")).
 
     sbtAssemblySettings,
 
-    libraryDependencies += "com.github.j-mie6" %% "parsley" % "4.2.1",
+    libraryDependencies += "com.github.j-mie6" %% "parsley" % "4.2.5",
     libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.15" % Test,
 
     // Some handy scala compiler flags

@@ -18,7 +18,7 @@ import parsley.token.predicate.Basic
 object Lexer {
   private val waccDesc = LexicalDesc.plain.copy(
     spaceDesc = SpaceDesc.plain.copy(
-      commentLine = "#",
+      commentLine = "#"
     ),
     symbolDesc = SymbolDesc.plain.copy(
       hardKeywords = Set(
@@ -72,8 +72,8 @@ object Lexer {
         "==",
         "!=",
         "&&",
-        "||",
-      ),
+        "||"
+      )
     ),
     nameDesc = NameDesc.plain.copy(
       identifierStart = Basic(c => Character.isLetter(c) || c == '_'),
@@ -100,19 +100,22 @@ object Lexer {
           '\\' -> 0x005c
         )
       ),
-      graphicCharacter = Basic(c =>
-        c >= ' ' && !Set('\\', '\'', '\"').contains(c)
-      )
+      graphicCharacter =
+        Basic(c => c >= ' ' && !Set('\\', '\'', '\"').contains(c))
     )
   )
   private val lexer = new Lexer(waccDesc)
 
   val VAR_ID: Parsley[String] = lexer.lexeme.names.identifier
-  
-  val INTEGER: Parsley[Int] = lexer.lexeme.numeric.integer.decimal32.label("integer")
-  val BOOL: Parsley[Boolean] = lexer.lexeme(attempt("true" #> true <|> "false" #> false)).label("boolean")
-  val STRING: Parsley[String] = lexer.lexeme.text.string.ascii.label("string literal")
-  val CHAR: Parsley[Char] = lexer.lexeme.text.character.ascii.label("char literal")
+
+  val INTEGER: Parsley[Int] =
+    lexer.lexeme.numeric.integer.decimal32.label("integer")
+  val BOOL: Parsley[Boolean] =
+    lexer.lexeme(attempt("true" #> true <|> "false" #> false)).label("boolean")
+  val STRING: Parsley[String] =
+    lexer.lexeme.text.string.ascii.label("string literal")
+  val CHAR: Parsley[Char] =
+    lexer.lexeme.text.character.ascii.label("char literal")
 
   def fully[A](p: Parsley[A]): Parsley[A] = lexer.fully(p)
 
