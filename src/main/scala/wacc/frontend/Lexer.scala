@@ -48,9 +48,6 @@ object Lexer {
         "char",
         "string",
         "pair",
-        "len",
-        "ord",
-        "chr",
         "true",
         "false",
         "null"
