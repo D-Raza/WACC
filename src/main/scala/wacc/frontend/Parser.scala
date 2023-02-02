@@ -25,4 +25,24 @@ object Parser {
 
   def parse(input: File): Result[String, BigInt] =
     program.parseFromFile(input).get
+
+  //     def parse(input: File): Result[String, Program] =
+  //     `<program>`.parseFromFile(input).get
+
+  // private lazy val `<program>` = fully(
+  //   "begin" *> Program(
+  //     many(`<func>`),
+  //     sepBy1(`<stat>`, ";") <* "end"
+  // ))
+
+  // private lazy val `<func>` = fully(
+  //   Func(
+  //     `<type>`,
+  //     `<ident>`,
+  //     "(" *> sepBy(`<param>`, ",") <* ")",
+  //     "is" *> sepBy1(`<stat>`, ";") <* "end"
+  // ))
+
+  // private lazy val `<param>` = Param(`<type>`, `<ident>`)
+
 }

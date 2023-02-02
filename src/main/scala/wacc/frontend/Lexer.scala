@@ -5,15 +5,10 @@ import Parsley._
 import parsley.implicits.character.stringLift
 import parsley.errors.combinator.ErrorMethods
 import parsley.token.Lexer
-import parsley.token.descriptions.LexicalDesc
-import parsley.token.descriptions.NameDesc
-import parsley.token.descriptions.SpaceDesc
-import parsley.token.descriptions.SymbolDesc
-import parsley.token.descriptions.numeric.ExponentDesc
-import parsley.token.descriptions.numeric.NumericDesc
-import parsley.token.descriptions.text.EscapeDesc
-import parsley.token.descriptions.text.TextDesc
-import parsley.token.predicate.Basic
+import parsley.token.descriptions.{LexicalDesc, NameDesc, SpaceDesc, SymbolDesc}
+import parsley.token.descriptions.numeric.{ExponentDesc, NumericDesc}
+import parsley.token.descriptions.text.{EscapeDesc, TextDesc}
+import parsley.token.predicate
 
 object Lexer {
   private val waccDesc = LexicalDesc.plain.copy(
@@ -73,8 +68,9 @@ object Lexer {
       )
     ),
     nameDesc = NameDesc.plain.copy(
-      identifierStart = Basic(c => Character.isLetter(c) || c == '_'),
-      identifierLetter = Basic(c => Character.isLetterOrDigit(c) || c == '_')
+      identifierStart = predicate.Basic(c => Character.isLetter(c) || c == '_'),
+      identifierLetter =
+        predicate.Basic(c => Character.isLetterOrDigit(c) || c == '_')
     ),
     numericDesc = NumericDesc.plain.copy(
       integerNumbersCanBeHexadecimal = false,
@@ -98,7 +94,7 @@ object Lexer {
         )
       ),
       graphicCharacter =
-        Basic(c => c >= ' ' && !Set('\\', '\'', '\"').contains(c))
+        predicate.Basic(c => c >= ' ' && !Set('\\', '\'', '\"').contains(c))
     )
   )
   private val lexer = new Lexer(waccDesc)
