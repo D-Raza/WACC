@@ -1,6 +1,6 @@
 package wacc
 
-object ast {
+object AST {
   case class Program(funcs: List[Func], stat: Stat)(pos: (Int, Int))
   case class Func(ty: Type, ident: Ident, paramList: ParamList, stat: Stat)(
       pos: (Int, Int)

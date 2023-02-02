@@ -1,4 +1,4 @@
-package wacc.frontend
+package wacc
 
 import wacc.frontend.Parser._
 import java.io.File

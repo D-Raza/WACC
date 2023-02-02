@@ -1,6 +1,6 @@
 milestone := "calc_examples"
 
-all: lint check build
+all: lint test build
 
 lint:
 	sbt scalafmtCheck
@@ -17,4 +17,4 @@ build:
 clean:
 	sbt clean && rm -rf wacc_examples/ wacc-33-compiler.jar test.log
 
-.PHONY: all build check lint format clean 
+.PHONY: all lint format test build clean 
