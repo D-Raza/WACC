@@ -38,7 +38,10 @@ object Compiler {
     var exitCode = 0;
 
     parseResult match {
-      case Success(x)   => println(f"$inputString = $x")
+      case Success(x) => {
+        for (line <- Source.fromFile(inputFile).getLines()) println(line);
+        println(x)
+      }
       case Failure(msg) => { println(msg); exitCode = 100 }
     }
 

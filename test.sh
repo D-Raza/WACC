@@ -16,6 +16,8 @@ else
   cd ..
 fi
 
+shopt -s extglob
+
 # Find all .wacc files in directory
 dir=${1:-wacc_examples}
 if ! files=$(find $dir -type f -name "*.wacc"); then
@@ -33,7 +35,7 @@ fi
 exec 4<&1 5<&2 1>&2>&>(tee -a >(sed -r 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[m|K]//g' > test.log))
 
 echo -e "\e[1;35m-----\e[0m \e[1;4;35mWACC Tests\e[0m \e[1;35m-----\e[0m"
-echo -e "\e[1;35mRunning tests in $dir:\e[0m"
+echo -e "\e[1;35mRunning $no_files tests in $dir:\e[0m"
 
 # Test each file
 no_errors=0
@@ -43,6 +45,11 @@ do
     if grep -q '# Exit:' $file; then 
         expected_exit_code=$(awk '/# Exit:/{getline; print}' $file | grep -o '[0-9]\+')
     fi 
+    
+    # Account for invalid exit codes
+    if [ "$expected_exit_code" -ne 100 ] && [ "$expected_exit_code" -ne 200 ]; then
+        expected_exit_code=0
+    fi
 
     output=$(./compile "$file")
     result_exit_code=$?
