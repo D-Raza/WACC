@@ -13,7 +13,7 @@ import parsley.io.ParseFromIO
 object Parser {
   def parse(input: File): Result[String, Program] =
     `<program>`.parseFromFile(input).get
-  
+
   // <program> ::= 'begin' <func>* <stat> 'end'
   private lazy val `<program>` = fully(
     "begin" *> Program(
@@ -38,7 +38,7 @@ object Parser {
   // <param> ::= <type> <ident>
   private lazy val `<param>` = Param(`<type>`, `<ident>`)
 
-   /* <stat> ::= "skip"
+  /* <stat> ::= "skip"
                | <type> <ident> "=" <expr>
                | <ident> "=" <expr>
                | "read" <ident>
@@ -97,7 +97,7 @@ object Parser {
 
   // <arg-list> ::= <expr> (‘,’ <expr>)*
   private lazy val `<arg-list>` = sepBy(`<expr>`, ",")
-  
+
   // <type> ::= <base-type> | <array-type> | <pair-type>
   private lazy val `<type>` = chain
     .postfix(`<base-type>` <|> `<pair-type>`, `<array-type>`)
@@ -170,9 +170,13 @@ object Parser {
 
   // <array-elem> ::= <ident> ('[' <expr> ']')+
   private lazy val `<array-elem>` =
-      attempt(ArrayElem(`<ident>`, some("[" *> `<expr>` <* "]")))  // TODO: is this correct?
+    attempt(
+      ArrayElem(`<ident>`, some("[" *> `<expr>` <* "]"))
+    ) // TODO: is this correct?
 
   // <array-liter> ::= '[' (<expr> (',' <expr>)*)? ']'
-  private lazy val `<array-liter>` = ArrayLit("[" *> sepBy(`<expr>`, ",") <* "]")
+  private lazy val `<array-liter>` = ArrayLit(
+    "[" *> sepBy(`<expr>`, ",") <* "]"
+  )
 
 }
