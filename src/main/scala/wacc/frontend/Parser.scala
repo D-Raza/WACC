@@ -59,8 +59,8 @@ object Parser {
   )
 
   private lazy val `<lvalue>` : Parsley[LValue] = (
-    `<ident>` <|>
-      `<array-elem>`
+    `<ident>`
+      <|> `<array-elem>`
       <|> `<pair-elem>`
   )
 
