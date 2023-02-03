@@ -1,4 +1,4 @@
-package wacc.frontend
+package wacc
 
 import wacc.frontend.Parser._
 import java.io.File
@@ -29,7 +29,6 @@ object Compiler {
       System.err.println(f"$inputFile is not a file! Exiting...")
       System.exit(-1)
     }
-    val inputString = Source.fromFile(inputFile).getLines().mkString
 
     // Frontend
     println("Compiling...")
@@ -38,7 +37,10 @@ object Compiler {
     var exitCode = 0;
 
     parseResult match {
-      case Success(x)   => println(f"$inputString = $x")
+      case Success(x) => {
+        for (line <- Source.fromFile(inputFile).getLines()) println(line);
+        println(x)
+      }
       case Failure(msg) => { println(msg); exitCode = 100 }
     }
 
