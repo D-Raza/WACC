@@ -13,7 +13,8 @@ import parsley.io.ParseFromIO
 object Parser {
   def parse(input: File): Result[String, Program] =
     `<program>`.parseFromFile(input).get
-
+  
+  // <program> ::= 'begin' <func>* <stat> 'end'
   private lazy val `<program>` = fully(
     "begin" *> Program(
       many(`<func>`),
@@ -21,6 +22,7 @@ object Parser {
     )
   )
 
+  // <func> ::= = <type> <ident> ‘(’ <param-list>? ‘)’ ‘is’ <stat> ‘end’
   private lazy val `<func>` = attempt(
     Func(
       `<type>`,
@@ -30,10 +32,25 @@ object Parser {
     )
   )
 
+  // <param-list> ::= <param> (',' <param>)*
   private lazy val `<param-list>` = sepBy(`<param>`, ",")
 
+  // <param> ::= <type> <ident>
   private lazy val `<param>` = Param(`<type>`, `<ident>`)
 
+   /* <stat> ::= "skip"
+               | <type> <ident> "=" <expr>
+               | <ident> "=" <expr>
+               | "read" <ident>
+               | "free" <ident>
+               | "return" <expr>
+               | "exit" <expr>
+               | "print" <expr>
+               | "println" <expr>
+               | "if" <expr> "then" <stat> "else" <stat> "fi"
+               | "while" <expr> "do" <stat> "done"
+               | "begin" <stat> "end"
+               | <stat> ";" <stat> */
   private lazy val `<stat>` : Parsley[Stat] = (
     Skip <# "skip"
       <|> Declare(`<type>`, `<ident>`, "=" *> `<rvalue>`)
@@ -58,15 +75,18 @@ object Parser {
       )
   )
 
+  // <lvalue> ::= <ident> | <array-elem> | <pair-elem>
   private lazy val `<lvalue>` : Parsley[LValue] = (
     `<ident>`
       <|> `<array-elem>`
       <|> `<pair-elem>`
   )
 
+  // <pair-elem> ::= "fst" <lvalue> | "snd" <lvalue>
   private lazy val `<pair-elem>` =
     Fst("fst" *> `<lvalue>`) <|> Snd("snd" *> `<lvalue>`)
 
+  // <rvalue> ::= <expr> | <array-liter> | 'newpair' '('' <expr> ',' <expr> ')' | `<pair-elem>` | 'call' <ident> '(' <arg-list> ')'
   private lazy val `<rvalue>` = (
     `<expr>`
       <|> `<array-liter>`
@@ -75,11 +95,14 @@ object Parser {
       <|> Call("call" *> `<ident>`, "(" *> `<arg-list>` <* ")")
   )
 
+  // <arg-list> ::= <expr> (‘,’ <expr>)*
   private lazy val `<arg-list>` = sepBy(`<expr>`, ",")
-
+  
+  // <type> ::= <base-type> | <array-type> | <pair-type>
   private lazy val `<type>` = chain
     .postfix(`<base-type>` <|> `<pair-type>`, `<array-type>`)
 
+  // <base-type> ::= 'int' | 'bool' | 'char' | 'string'
   private lazy val `<base-type>` = (
     (IntType <# "int")
       <|> (BoolType <# "bool")
@@ -87,13 +110,16 @@ object Parser {
       <|> (StringType <# "string")
   )
 
+  // <array-type> ::= <type> '[' ']'
   private lazy val `<array-type>` = ArrayType <# ("[" <* "]")
 
+  // <pair-type> ::= ‘pair’ ‘(’ <pair-elem-type> ‘,’ <pair-elem-type> ‘)’
   private lazy val `<pair-type>` = PairType(
     "pair" *> "(" *> `<pair-elem-type>` <* ",",
     `<pair-elem-type>` <* ")"
   )
 
+  // <pair-elem-type> ::= <base-type> | <array-type> | "pair"
   private lazy val `<pair-elem-type>` : Parsley[PairElemType] = attempt(
     chain.postfix1(`<base-type>` <|> `<pair-type>`, ArrayType <# ("[" <* "]"))
   ) <|> `<base-type>` <|> (InnerPairType <# "pair")
@@ -134,19 +160,19 @@ object Parser {
         StrLiter(STRING),
         `<array-elem>`,
         `<ident>`,
-        Bracket("(" *> `<expr>` <* ")")
+        Bracket("(" *> `<expr>` <* ")"),
+        PairLiter <# "null"
       )
   )
 
+  // <ident> ::= (‘_’ | ‘a’-‘z’ | ‘A’-‘Z’) (‘–’ | ‘a’-‘z’ | ‘A’-‘Z’ | ‘0’-‘9’)*
   private lazy val `<ident>` = Ident(VAR_ID)
 
+  // <array-elem> ::= <ident> ('[' <expr> ']')+
   private lazy val `<array-elem>` =
-    attempt(
-      ArrayElem(`<ident>`, some("[" *> `<expr>` <* "]"))
-    ) // TODO: is this correct?
+      attempt(ArrayElem(`<ident>`, some("[" *> `<expr>` <* "]")))  // TODO: is this correct?
 
-  private lazy val `<array-liter>` = ArrayLit(
-    ("[" *> sepBy(`<expr>`, ",") <* "]")
-  )
+  // <array-liter> ::= '[' (<expr> (',' <expr>)*)? ']'
+  private lazy val `<array-liter>` = ArrayLit("[" *> sepBy(`<expr>`, ",") <* "]")
 
 }
