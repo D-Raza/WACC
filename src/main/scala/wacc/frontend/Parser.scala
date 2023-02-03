@@ -99,13 +99,13 @@ object Parser {
   ) <|> `<base-type>` <|> (InnerPairType <# "pair")
 
   private lazy val `<expr>` : Parsley[Expr] = precedence(
-    SOps(InfixL)(Or <# "||") +:
-      SOps(InfixL)(And <# "&&") +:
-      SOps(InfixL)(
+    SOps(InfixR)(Or <# "||") +:
+      SOps(InfixR)(And <# "&&") +:
+      SOps(InfixN)(
         Equal <# "==",
         NotEqual <# "!="
       )
-      +: SOps(InfixL)(
+      +: SOps(InfixN)(
         LT <# "<",
         LTE <# "<=",
         GT <# ">",
