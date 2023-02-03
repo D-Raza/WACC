@@ -29,7 +29,6 @@ object Compiler {
       System.err.println(f"$inputFile is not a file! Exiting...")
       System.exit(-1)
     }
-    val inputString = Source.fromFile(inputFile).getLines().mkString
 
     // Frontend
     println("Compiling...")
