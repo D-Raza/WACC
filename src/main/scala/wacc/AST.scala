@@ -64,13 +64,15 @@ object genericbridgesPos {
 object AST {
   import genericbridgesPos._
 
+  val NULLPOS: (Int, Int) = (-1, -1)
+
   /* Case Classes and Traits */
   case class Program(funcs: List[Func], stat: List[Stat])(val pos: (Int, Int))
   case class Func(
       ty: Type,
       ident: Ident,
       paramList: List[Param],
-      stat: List[Stat]
+      stats: List[Stat]
   )(
       val pos: (Int, Int)
   )
@@ -97,7 +99,7 @@ object AST {
 
   // LValues
   sealed trait LValue
-  case class Ident(x: String)(val pos: (Int, Int)) extends LValue with Expr
+  case class Ident(name: String)(val pos: (Int, Int)) extends LValue with Expr
   case class ArrayElem(ident: Ident, xs: List[Expr])(val pos: (Int, Int))
       extends LValue
       with Expr
