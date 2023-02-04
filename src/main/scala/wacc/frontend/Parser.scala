@@ -77,9 +77,9 @@ object Parser {
 
   // <lvalue> ::= <ident> | <array-elem> | <pair-elem>
   private lazy val `<lvalue>` : Parsley[LValue] = (
-      attempt(`<array-elem>`)
-      <|> `<ident>`
+    attempt(`<array-elem>`)
       <|> `<pair-elem>`
+      <|> `<ident>`
   )
 
   // <pair-elem> ::= "fst" <lvalue> | "snd" <lvalue>
@@ -166,10 +166,11 @@ object Parser {
   )
 
   // <ident> ::= (‘_’ | ‘a’-‘z’ | ‘A’-‘Z’) (‘–’ | ‘a’-‘z’ | ‘A’-‘Z’ | ‘0’-‘9’)*
-  private lazy val `<ident>`= Ident(VAR_ID)
+  private lazy val `<ident>` = Ident(VAR_ID)
 
   // <array-elem> ::= <ident> ('[' <expr> ']')+
-  private lazy val `<array-elem>` = ArrayElem(`<ident>`, some("[" *> `<expr>` <* "]"))
+  private lazy val `<array-elem>` =
+    ArrayElem(`<ident>`, some("[" *> `<expr>` <* "]"))
 
   // <array-liter> ::= '[' (<expr> (',' <expr>)*)? ']'
   private lazy val `<array-liter>` = ArrayLit(
