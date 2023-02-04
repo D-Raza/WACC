@@ -1,4 +1,4 @@
-milestone := "wacc_examples/valid/!(pairs|advanced|array|runtimeErr)/"
+milestone := "wacc_examples/valid/" 
 
 all: lint test build
 

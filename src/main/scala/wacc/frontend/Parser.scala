@@ -77,8 +77,8 @@ object Parser {
 
   // <lvalue> ::= <ident> | <array-elem> | <pair-elem>
   private lazy val `<lvalue>` : Parsley[LValue] = (
-    `<ident>`
-      <|> `<array-elem>`
+      attempt(`<array-elem>`)
+      <|> `<ident>`
       <|> `<pair-elem>`
   )
 
@@ -111,7 +111,7 @@ object Parser {
   )
 
   // <array-type> ::= <type> '[' ']'
-  private lazy val `<array-type>` = ArrayType <# ("[" <* "]")
+  private lazy val `<array-type>` = ArrayType <# "[]" // ("[" <* "]")
 
   // <pair-type> ::= ‘pair’ ‘(’ <pair-elem-type> ‘,’ <pair-elem-type> ‘)’
   private lazy val `<pair-type>` = PairType(
@@ -121,7 +121,7 @@ object Parser {
 
   // <pair-elem-type> ::= <base-type> | <array-type> | "pair"
   private lazy val `<pair-elem-type>` : Parsley[PairElemType] = attempt(
-    chain.postfix1(`<base-type>` <|> `<pair-type>`, ArrayType <# ("[" <* "]"))
+    chain.postfix1(`<base-type>` <|> `<pair-type>`, `<array-type>`)
   ) <|> `<base-type>` <|> (InnerPairType <# "pair")
 
   private lazy val `<expr>` : Parsley[Expr] = precedence(
@@ -158,7 +158,7 @@ object Parser {
         BoolLiter(BOOL),
         CharLiter(CHAR),
         StrLiter(STRING),
-        `<array-elem>`,
+        attempt(`<array-elem>`),
         `<ident>`,
         Bracket("(" *> `<expr>` <* ")"),
         PairLiter <# "null"
@@ -166,13 +166,10 @@ object Parser {
   )
 
   // <ident> ::= (‘_’ | ‘a’-‘z’ | ‘A’-‘Z’) (‘–’ | ‘a’-‘z’ | ‘A’-‘Z’ | ‘0’-‘9’)*
-  private lazy val `<ident>` = Ident(VAR_ID)
+  private lazy val `<ident>`= Ident(VAR_ID)
 
   // <array-elem> ::= <ident> ('[' <expr> ']')+
-  private lazy val `<array-elem>` =
-    attempt(
-      ArrayElem(`<ident>`, some("[" *> `<expr>` <* "]"))
-    ) // TODO: is this correct?
+  private lazy val `<array-elem>` = ArrayElem(`<ident>`, some("[" *> `<expr>` <* "]"))
 
   // <array-liter> ::= '[' (<expr> (',' <expr>)*)? ']'
   private lazy val `<array-liter>` = ArrayLit(
