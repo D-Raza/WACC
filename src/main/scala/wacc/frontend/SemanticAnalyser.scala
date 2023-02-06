@@ -96,34 +96,74 @@ object SemanticAnalyser {
   //   }
   // }
 
-  // def evalTypeOfExpr(expr: Expr, symbolTable: Map[Ident, Type]): (Type, List[String]) = {
-  //     expr match {
-  //       case Ident(name) =>
-  //       case ArrayElem(ident, xs) =>
-  //       case IntegerLiter(x) =>
-  //       case BoolLiter(x) =>
-  //       case CharLiter(x) =>
-  //       case StrLiter(x) =>
-  //       case PairLiter() =>
-  //       case Mult(x, y) =>
-  //       case Div(x, y) =>
-  //       case Mod(x, y) =>
-  //       case Add(x, y) =>
-  //       case Sub(x, y) =>
-  //       case Equal(x, y) =>
-  //       case NotEqual(x, y) =>
-  //       case LT(x, y) =>
-  //       case LTE(x, y) =>
-  //       case And(x, y) =>
-  //       case Or(x, y) =>
-  //       case GT(x, y) =>
-  //       case GTE(x, y) =>
-  //       case Not(x) =>
-  //       case Negate(x) =>
-  //       case Len(x) =>
-  //       case Ord(x) =>
-  //       case Chr(x) =>
-  //       case Bracket(x) =>
-  //     }
-  //   }
+  def evalTypeOfExpr(expr: Expr, symbolTable: Map[Ident, Type]): (Type, List[String]) = {
+      expr match {
+        case ident: Ident => {
+          if (symbolTable contains ident) {
+            (symbolTable(ident), Nil)
+          } else {
+            (ErrorType()(NULLPOS), List("Undeclared variable: " + ident.name))
+          }
+        }
+        case ArrayElem(ident, xs) => checkExprs(xs, IntType()(NULLPOS), symbolTable)
+        case intLit: IntegerLiter => (IntType()(NULLPOS), Nil)
+        case boolLit: BoolLiter => (BoolType()(NULLPOS), Nil)
+        case charLit: CharLiter => (CharType()(NULLPOS), Nil)
+        case strLit: StrLiter => (StringType()(NULLPOS), Nil)
+        case pairLit: PairLiter => (NullType()(NULLPOS), Nil)
+        case mul @ Mult(x, y) => check2ExprType(x, y, IntType()(NULLPOS), symbolTable)
+        case div @ Div(x, y) => check2ExprType(x, y, IntType()(NULLPOS), symbolTable)
+        case mod @ Mod(x, y) => check2ExprType(x, y, IntType()(NULLPOS), symbolTable)
+        case add @ Add(x, y) => check2ExprType(x, y, IntType()(NULLPOS), symbolTable)
+        case sub @ Sub(x, y) => check2ExprType(x, y, IntType()(NULLPOS), symbolTable)
+        case eq @ Equal(x, y) => check2ExprType(x, y, IntType()(NULLPOS), symbolTable)
+        case neq @ NotEqual(x, y) => check2ExprType(x, y, IntType()(NULLPOS), symbolTable)
+        case lt @ LT(x, y) => check2ExprType(x, y, IntType()(NULLPOS), symbolTable)
+        case lte @ LTE(x, y) => check2ExprType(x, y, IntType()(NULLPOS), symbolTable)
+        case and @ And(x, y) => check2ExprType(x, y, BoolType()(NULLPOS), symbolTable)
+        case or @ Or(x, y) => check2ExprType(x, y, BoolType()(NULLPOS), symbolTable)
+        case gt @ GT(x, y) => check2ExprType(x, y, IntType()(NULLPOS), symbolTable)
+        case gte @ GTE(x, y) => check2ExprType(x, y, IntType()(NULLPOS), symbolTable)
+        case not: Not => checkExprType(not, BoolType()(NULLPOS), symbolTable)
+        case neg: Negate => checkExprType(neg, IntType()(NULLPOS), symbolTable)
+        case len: Len => (NullType()(NULLPOS), Nil) // checkExprType(len, ArrayType()(NULLPOS), symbolTable)
+        case ord: Ord => checkExprType(ord, CharType()(NULLPOS), symbolTable)
+        case chr: Chr => checkExprType(chr, IntType()(NULLPOS), symbolTable)
+        case Bracket(x) => evalTypeOfExpr(x, symbolTable)
+      }
+    }
+  
+  // Check that an expression is of a certain type
+  private def checkExprType(expr: Expr, expectedType: Type, symbolTable: Map[Ident, Type]): (Type, List[String]) = {
+    val (exprType, error) = evalTypeOfExpr(expr, symbolTable)
+    exprType match {
+      case exprType if exprType == expectedType => (exprType, error)
+      case _ => (ErrorType()(NULLPOS), error :+ "Expected type " + expectedType + " but got " + exprType + " instead")
+    }
+  }
+
+  // Check that two expressions are of the same expected type
+  private def check2ExprType(expr1: Expr, expr2: Expr, expectedType: Type, symbolTable: Map[Ident, Type]): (Type, List[String]) = {
+    val (expr1Type, error1) = evalTypeOfExpr(expr1, symbolTable)
+    val (expr2Type, error2) = evalTypeOfExpr(expr2, symbolTable)
+    val errors = error1 ++ error2
+    expr1Type match {
+      case expr1Type if expr1Type == expectedType && expr1Type == expr2Type => (expr1Type, errors)
+      case _ => (ErrorType()(NULLPOS), errors :+ "Expected type " + expectedType + " but got " + expr1Type + " instead")
+    }
+  }
+  
+  // Check that a list of expressions are of a certain type 
+  private def checkExprs(exprs: List[Expr], expectedType: Type, symbolTable: Map[Ident, Type]): (Type, List[String]) = {
+    val evals = exprs.map(checkExprType(_, expectedType, symbolTable))
+    val types = evals.map(_._1)
+    val errors = evals.flatMap(_._2)
+    if (types.distinct.length == 1 && types.head == expectedType) {
+      (types.head, errors)
+    } 
+    else {
+      (ErrorType()(NULLPOS), errors :+ "Expected type " + expectedType + " but got " + types + " instead")
+    }
+  }
+
 }

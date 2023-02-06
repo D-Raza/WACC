@@ -131,6 +131,8 @@ object AST {
   case class Fst(p: LValue)(val pos: (Int, Int)) extends PairElem
   case class Snd(p: LValue)(val pos: (Int, Int)) extends PairElem
   case class InnerPairType()(val pos: (Int, Int)) extends PairElemType
+  case class NullType()(val pos: (Int, Int)) extends Type
+  case class ErrorType()(val pos: (Int, Int)) extends Type
 
   // Literals
   case class IntegerLiter(x: Int)(val pos: (Int, Int)) extends Expr
@@ -203,6 +205,8 @@ object AST {
   object Fst extends ParserBridgePos1[LValue, Fst]
   object Snd extends ParserBridgePos1[LValue, Snd]
   object InnerPairType extends ParserBridgePos0[InnerPairType]
+  object NullType extends ParserBridgePos0[NullType]
+  object ErrorType extends ParserBridgePos0[ErrorType]
 
   // Literals
   object IntegerLiter extends ParserBridgePos1[Int, IntegerLiter]
