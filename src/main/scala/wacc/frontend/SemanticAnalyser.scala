@@ -59,6 +59,7 @@ object SemanticAnalyser {
           if (!(symbolTable contains ident))
             errors += "Redefined variable: " + ident.name
 
+          // TODO: add newly declared vars to symbol table
           val (rValueType, rValueErrors) = evalTypeOfRValue(rvalue, symbolTable)
           errors.addAll(rValueErrors)
           if (!(rValueType equiv ty))
@@ -118,7 +119,42 @@ object SemanticAnalyser {
         case Print(expr) => {
           val (exprType, exprTypeErrors) = evalTypeOfExpr(expr, symbolTable)
           errors ++= exprTypeErrors
+        }
 
+        case Println(expr) => {
+          val (exprType, exprTypeErrors) = evalTypeOfExpr(expr, symbolTable)
+          errors ++= exprTypeErrors
+        }
+
+        case If(cond, thenStat, elseStat) => {
+          val (condType, condTypeErrors) = evalTypeOfExpr(cond, symbolTable)
+          errors ++= condTypeErrors
+          condType match {
+            case BoolType() =>
+            case _ => errors :+ f"Type mismatch: expected Bool, got $condType"
+          }
+
+          errors ++= checkStatSemantics(symbolTable, thenStat, returnType)
+          errors ++= checkStatSemantics(symbolTable, elseStat, returnType)
+
+        }
+
+        case While(cond, doStat) => {
+          val (condType, condTypeErrors) = evalTypeOfExpr(cond, symbolTable)
+          errors ++= condTypeErrors
+          condType match {
+            case BoolType() =>
+            case _ => errors :+ f"Type mismatch: expected Bool, got $condType"
+          }
+          errors ++= checkStatSemantics(symbolTable, doStat, returnType)
+        }
+
+        case Scope(scopeStats) => {
+          errors ++= checkStatSemantics(
+            symbolTable,
+            scopeStats,
+            returnType
+          )
         }
 
         case _ => errors += "TODO: Implement checkStatSemantics"
