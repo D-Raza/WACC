@@ -104,6 +104,8 @@ object AST {
       extends LValue
       with Expr
   sealed trait PairElem extends LValue with RValue
+  case class Fst(p: LValue)(val pos: (Int, Int)) extends PairElem
+  case class Snd(p: LValue)(val pos: (Int, Int)) extends PairElem
 
   // RValues
   sealed trait RValue
@@ -113,25 +115,56 @@ object AST {
   case class Call(x: Ident, args: List[Expr])(val pos: (Int, Int))
       extends RValue
 
-  // Types
-  sealed trait Type
-  sealed trait PairElemType
+// Types
+  sealed trait WACCType {
+    def equiv(that: WACCType): Boolean =
+      (this, that) match {
+        case (_, AnyType())                         => true
+        case (AnyType(), _)                         => true
+        case (ArrayType(thisTy), ArrayType(thatTy)) => thisTy equiv thatTy
+        case (ArrayType(CharType()), StringType())  => true
+        case (
+              PairType(thisFstType, thisSndType),
+              PairType(thatFstType, thatSndType)
+            ) =>
+          (thisFstType equiv thatFstType) && (thisSndType equiv thatSndType)
+        case _ => this == that
+      }
+  }
+
+  sealed trait Type extends WACCType {
+    def eraseInnerTypes: PairElemType =
+      this.asInstanceOf[PairElemType] // TODO: Hacky
+  }
+  sealed trait PairElemType extends WACCType {
+    def asType: Type = this.asInstanceOf[Type] // TODO: Hacky
+  }
+
+  case class AnyType()(val pos: (Int, Int)) extends Type with PairElemType
+
+  // Base Types
   sealed trait BaseType extends Type with PairElemType
-  case class Pair()(val pos: (Int, Int)) extends PairElemType
-  case class ArrayType(ty: Type)(val pos: (Int, Int))
-      extends Type
-      with PairElemType
   case class IntType()(val pos: (Int, Int)) extends BaseType
   case class BoolType()(val pos: (Int, Int)) extends BaseType
   case class CharType()(val pos: (Int, Int)) extends BaseType
   case class StringType()(val pos: (Int, Int)) extends BaseType
+
+  // Array Types
+  case class ArrayType(ty: Type)(val pos: (Int, Int))
+      extends Type
+      with PairElemType
+
+  // Pair Types
   case class PairType(fstType: PairElemType, sndType: PairElemType)(
       val pos: (Int, Int)
-  ) extends Type
-  case class Fst(p: LValue)(val pos: (Int, Int)) extends PairElem
-  case class Snd(p: LValue)(val pos: (Int, Int)) extends PairElem
-  case class InnerPairType()(val pos: (Int, Int)) extends PairElemType
-  case class NullType()(val pos: (Int, Int)) extends Type
+  ) extends Type {
+    override def eraseInnerTypes: PairElemType = InnerPairType()(pos)
+  }
+  case class InnerPairType()(val pos: (Int, Int)) extends PairElemType {
+    override def asType: Type =
+      PairType(AnyType()(NULLPOS), AnyType()(NULLPOS))(pos)
+  }
+
   case class ErrorType()(val pos: (Int, Int)) extends Type
 
   // Literals
@@ -139,7 +172,9 @@ object AST {
   case class BoolLiter(x: Boolean)(val pos: (Int, Int)) extends Expr
   case class CharLiter(x: Char)(val pos: (Int, Int)) extends Expr
   case class StrLiter(x: String)(val pos: (Int, Int)) extends Expr
-  case class PairLiter()(val pos: (Int, Int)) extends Expr
+
+  sealed trait PairLiter extends Expr
+  case class Null()(val pos: (Int, Int)) extends PairLiter
 
   // Binary operators
   case class Mult(x: Expr, y: Expr)(val pos: (Int, Int)) extends Expr
@@ -188,6 +223,8 @@ object AST {
   // LValues
   object Ident extends ParserBridgePos1[String, Ident]
   object ArrayElem extends ParserBridgePos2[Ident, List[Expr], ArrayElem]
+  object Fst extends ParserBridgePos1[LValue, Fst]
+  object Snd extends ParserBridgePos1[LValue, Snd]
 
   // RValues
   object ArrayLit extends ParserBridgePos1[List[Expr], ArrayLit]
@@ -195,17 +232,14 @@ object AST {
   object Call extends ParserBridgePos2[Ident, List[Expr], Call]
 
   // Types
-  object Pair extends ParserBridgePos0[Pair]
+  object AnyType extends ParserBridgePos0[AnyType]
   object ArrayType extends ParserBridgePos1[Type, ArrayType]
   object IntType extends ParserBridgePos0[IntType]
   object BoolType extends ParserBridgePos0[BoolType]
   object CharType extends ParserBridgePos0[CharType]
   object StringType extends ParserBridgePos0[StringType]
   object PairType extends ParserBridgePos2[PairElemType, PairElemType, PairType]
-  object Fst extends ParserBridgePos1[LValue, Fst]
-  object Snd extends ParserBridgePos1[LValue, Snd]
   object InnerPairType extends ParserBridgePos0[InnerPairType]
-  object NullType extends ParserBridgePos0[NullType]
   object ErrorType extends ParserBridgePos0[ErrorType]
 
   // Literals
@@ -213,7 +247,7 @@ object AST {
   object BoolLiter extends ParserBridgePos1[Boolean, BoolLiter]
   object CharLiter extends ParserBridgePos1[Char, CharLiter]
   object StrLiter extends ParserBridgePos1[String, StrLiter]
-  object PairLiter extends ParserBridgePos0[PairLiter]
+  object Null extends ParserBridgePos0[Null]
 
   // Binary operators
   object Mult extends ParserBridgePos2[Expr, Expr, Mult]

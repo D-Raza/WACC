@@ -161,7 +161,7 @@ object Parser {
         attempt(`<array-elem>`),
         `<ident>`,
         Bracket("(" *> `<expr>` <* ")"),
-        PairLiter <# "null"
+        Null <# "null"
       )
   )
 
