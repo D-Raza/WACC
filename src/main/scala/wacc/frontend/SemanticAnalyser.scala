@@ -230,7 +230,8 @@ object SemanticAnalyser {
       }
       case Fst(l) => {
         evalTypeOfLValue(l) match {
-          case (PairType(fstTy, _), lValueErrors) => (fstTy.asType, lValueErrors)
+          case (PairType(fstTy, _), lValueErrors) =>
+            (fstTy.asType, lValueErrors)
           case (ty, lValueErrors) =>
             (
               ErrorType()(NULLPOS),
@@ -240,7 +241,8 @@ object SemanticAnalyser {
       }
       case Snd(l) => {
         evalTypeOfLValue(l) match {
-          case (PairType(_, sndTy), lValueErrors) => (sndTy.asType, lValueErrors)
+          case (PairType(_, sndTy), lValueErrors) =>
+            (sndTy.asType, lValueErrors)
           case (ty, lValueErrors) =>
             (
               ErrorType()(NULLPOS),
@@ -381,12 +383,20 @@ object SemanticAnalyser {
             (ErrorType()(NULLPOS), errors :+ "Array index is not an integer")
         }
       }
-      case not @ Not(x)    => checkExprType(x, BoolType()(not.pos))
-      case neg @ Negate(x) => checkExprType(x, IntType()(neg.pos))
+      case not @ Not(x) =>
+        checkExprType(x, BoolType()(not.pos), BoolType()(not.pos))
+      case neg @ Negate(x) =>
+        checkExprType(x, IntType()(neg.pos), IntType()(neg.pos))
       case len @ Len(x) =>
-        checkExprType(x, ArrayType(AnyType()(len.pos))(len.pos))
-      case ord @ Ord(x) => checkExprType(x, CharType()(ord.pos))
-      case chr @ Chr(x) => checkExprType(x, IntType()(chr.pos))
+        checkExprType(
+          x,
+          ArrayType(AnyType()(len.pos))(len.pos),
+          IntType()(len.pos)
+        )
+      case ord @ Ord(x) =>
+        checkExprType(x, CharType()(ord.pos), IntType()(ord.pos))
+      case chr @ Chr(x) =>
+        checkExprType(x, IntType()(chr.pos), CharType()(chr.pos))
       case mul @ Mult(x, y) =>
         check2ExprType(Set(IntType()(NULLPOS)), x, y, IntType()(mul.pos))
       case div @ Div(x, y) =>
@@ -440,12 +450,13 @@ object SemanticAnalyser {
   // Check that an expression is of a certain type
   private def checkExprType(
       expr: Expr,
-      expectedType: Type
+      expectedType: Type,
+      retType: Type // The type of the return value
   )(implicit symbolTable: Map[Ident, Type]): (Type, List[String]) = {
     val (exprType, error) = evalTypeOfExpr(expr)
 
     if (exprType equiv expectedType) {
-      (expectedType, error)
+      (retType, error)
     } else {
       (
         ErrorType()(NULLPOS),
@@ -495,7 +506,7 @@ object SemanticAnalyser {
     exprs match {
       case Nil => (expectedType, Nil)
       case _ => {
-        val evals = exprs.map(checkExprType(_, expectedType))
+        val evals = exprs.map(checkExprType(_, expectedType, expectedType))
         val types = evals.map(_._1)
         val errors = evals.flatMap(_._2)
         if (types.distinct.length == 1 && (types.head equiv expectedType)) {
