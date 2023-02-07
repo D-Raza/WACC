@@ -1,4 +1,4 @@
-milestone := "wacc_examples/valid/!(runtimeErr)/"
+milestone := "wacc_examples/**/**/!(integerOverflow)"
 
 all: lint test build
 

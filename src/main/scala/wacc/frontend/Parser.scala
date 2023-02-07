@@ -22,13 +22,24 @@ object Parser {
     )
   )
 
+  private def missingFuncRet(stats: List[Stat]): Boolean = {
+    stats.last match {
+      case Return(_) | Exit(_) => false
+      case Scope(scopedStats)  => missingFuncRet(scopedStats)
+      case If(_, thenStats, elseStats) =>
+        missingFuncRet(thenStats) || missingFuncRet(elseStats)
+      case While(_, doStats) => missingFuncRet(doStats)
+      case _                 => true
+    }
+  }
+
   // <func> ::= = <type> <ident> ‘(’ <param-list>? ‘)’ ‘is’ <stat> ‘end’
   private lazy val `<func>` = attempt(
     Func(
       `<type>`,
       `<ident>`,
       "(" *> `<param-list>` <* ")",
-      "is" *> sepBy1(`<stat>`, ";") <* "end"
+      "is" *> sepBy1(`<stat>`, ";").filterNot(missingFuncRet) <* "end"
     )
   )
 
@@ -161,7 +172,7 @@ object Parser {
         attempt(`<array-elem>`),
         `<ident>`,
         Bracket("(" *> `<expr>` <* ")"),
-        PairLiter <# "null"
+        Null <# "null"
       )
   )
 

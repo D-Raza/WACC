@@ -1,6 +1,7 @@
 package wacc
 
 import wacc.frontend.Parser._
+import wacc.frontend.SemanticAnalyser._
 import java.io.File
 import scala.io.Source
 import parsley.{Success, Failure}
@@ -30,6 +31,9 @@ object Compiler {
       System.exit(-1)
     }
 
+    // DEBUG
+    Source.fromFile(inputFile).getLines().foreach(println);
+
     // Frontend
     println("Compiling...")
 
@@ -38,8 +42,15 @@ object Compiler {
 
     parseResult match {
       case Success(x) => {
-        for (line <- Source.fromFile(inputFile).getLines()) println(line);
         println(x)
+        val errors = checkProgramSemantics(x)
+        if (errors.isEmpty) {
+          println("No errors found!")
+        } else {
+          println("Errors found:")
+          errors.foreach(println)
+          exitCode = 200
+        }
       }
       case Failure(msg) => { println(msg); exitCode = 100 }
     }
