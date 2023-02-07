@@ -112,11 +112,11 @@ object AST {
   sealed trait WACCType {
     def equiv(that: WACCType): Boolean =
       (this, that) match {
-        case (_, AnyType()) | (AnyType(), _)        => true
+        case (_, AnyType()) | (AnyType(), _)         => true
         case (_, UnknownType()) | (UnknownType(), _) => true
-        case (_, ErrorType()) | (ErrorType(), _)    => false
-        case (ArrayType(thisTy), ArrayType(thatTy)) => thisTy equiv thatTy
-        case (ArrayType(CharType()), StringType())  => true
+        case (_, ErrorType()) | (ErrorType(), _)     => false
+        case (ArrayType(thisTy), ArrayType(thatTy))  => thisTy equiv thatTy
+        case (ArrayType(CharType()), StringType())   => true
         case (
               PairType(thisFstType, thisSndType),
               PairType(thatFstType, thatSndType)
@@ -159,7 +159,8 @@ object AST {
     def eraseInnerTypes: PairElemType = InnerPairType()(pos)
   }
   case class InnerPairType()(val pos: (Int, Int)) extends PairElemType {
-    def asType: Type = PairType(UnknownType()(NULLPOS), UnknownType()(NULLPOS))(pos)
+    def asType: Type =
+      PairType(UnknownType()(NULLPOS), UnknownType()(NULLPOS))(pos)
   }
 
   // Literals

@@ -50,7 +50,7 @@ object Lexer {
         "null",
         "len",
         "ord",
-        "chr",
+        "chr"
       ),
       hardOperators = Set(
         "!",
