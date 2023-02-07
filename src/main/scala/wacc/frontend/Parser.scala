@@ -159,7 +159,7 @@ object Parser {
       )
       +: SOps(Prefix)(
         Not <# "!",
-        Negate <# "-",
+        Negate <# NEGATE,
         Len <# "len",
         Ord <# "ord",
         Chr <# "chr"

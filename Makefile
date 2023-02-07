@@ -1,4 +1,4 @@
-milestone := "wacc_examples/**/**/!(integerOverflow)"
+milestone := "wacc_examples/"
 
 all: lint test build
 

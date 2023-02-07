@@ -5,6 +5,7 @@ import Parsley._
 import parsley.implicits.character.stringLift
 import parsley.errors.combinator.ErrorMethods
 import parsley.token.Lexer
+import parsley.character.digit
 import parsley.token.descriptions.{LexicalDesc, NameDesc, SpaceDesc, SymbolDesc}
 import parsley.token.descriptions.numeric.{ExponentDesc, NumericDesc}
 import parsley.token.descriptions.text.{EscapeDesc, TextDesc}
@@ -103,12 +104,8 @@ object Lexer {
   private val lexer = new Lexer(waccDesc)
 
   val VAR_ID: Parsley[String] = lexer.lexeme.names.identifier
-
-  // private val BIGINT: Parsley[BigInt] =
-  //   lexer.lexeme.numeric.integer.decimal.filter(_.isValidInt)
-  // val INTEGER: Parsley[Int] =
-  //   BIGINT.map(_.intValue)
-
+  val NEGATE: Parsley[Unit] =
+    lexer.lexeme(attempt(("-") *> notFollowedBy(digit))).label("neg")
   val INTEGER: Parsley[Int] =
     lexer.lexeme.numeric.integer.decimal32.label("integer")
   val BOOL: Parsley[Boolean] =
