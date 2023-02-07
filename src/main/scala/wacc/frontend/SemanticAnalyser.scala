@@ -364,24 +364,44 @@ object SemanticAnalyser {
           }
         }
 
-        checkExprs(xs, IntType()(NULLPOS)) match {
-          case (IntType(), errors) => {
-            symbolTable get ident match {
-              case Some(t @ ArrayType(_)) => {
-                if (xs.length <= getArrayTypeRank(t))
-                  (t, errors)
-                else
-                  (ErrorType()(NULLPOS), List("Array dimension mismatch"))
+        val errors: mutable.ListBuffer[String] = mutable.ListBuffer.empty
+
+        (symbolTable get ident) match {
+          case Some(t @ ArrayType(innerType)) => {
+            val (argTypes, argErrors) =
+              xs.map(evalTypeOfExpr(_)).unzip
+            errors ++= argErrors.flatten
+
+            if (xs.length > getArrayTypeRank(t))
+              (
+                ErrorType()(NULLPOS),
+                (errors += "Array dimension mismatch").toList
+              )
+
+            argTypes.foreach {
+              case argType => {
+                if (!(argType equiv IntType()(NULLPOS)))
+                  (
+                    ErrorType()(NULLPOS),
+                    (errors += f"Array $ident accessed with argument of type $argType, expected Int").toList
+                  )
               }
-              case Some(_) =>
-                (ErrorType()(NULLPOS), errors :+ "Variable is not an array")
-              case None =>
-                (ErrorType()(NULLPOS), errors :+ "Variable not defined")
             }
+
+            (innerType, errors.toList)
           }
-          case (t, errors) =>
-            (ErrorType()(NULLPOS), errors :+ "Array index is not an integer")
+          case Some(_) =>
+            (
+              ErrorType()(NULLPOS),
+              (errors += "Variable is not an array").toList
+            )
+          case None =>
+            (
+              ErrorType()(NULLPOS),
+              (errors += f"Undeclared variable: ${ident.name}").toList
+            )
         }
+
       }
       case not @ Not(x) =>
         checkExprType(x, BoolType()(not.pos), BoolType()(not.pos))
