@@ -300,7 +300,7 @@ object SemanticAnalyser {
 
             argTypes.zip(paramTypes).foreach {
               case (argType, paramType) => {
-                if (!argType.equals(paramType))
+                if (!(argType equiv paramType))
                   errors += f"Function $f called with argument of type $argType, expected $paramType"
               }
             }
