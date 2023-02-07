@@ -366,7 +366,7 @@ object SemanticAnalyser {
           case (IntType(), errors) => {
             symbolTable get ident match {
               case Some(t @ ArrayType(_)) => {
-                if (getArrayTypeRank(t) == xs.length)
+                if (xs.length <= getArrayTypeRank(t))
                   (t, errors)
                 else
                   (ErrorType()(NULLPOS), List("Array dimension mismatch"))
