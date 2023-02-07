@@ -24,9 +24,6 @@ build-job:
 
 test-job:
   stage: test
-  only:
-    - master
-    - merge_requests
   extends: .install_dependencies
   script:
     - make test

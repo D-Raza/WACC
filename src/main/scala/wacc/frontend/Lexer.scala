@@ -95,8 +95,9 @@ object Lexer {
           '\\' -> 0x005c
         )
       ),
-      graphicCharacter =
-        predicate.Basic(c => c >= ' ' && c <= '~' && !Set('\\', '\'', '\"').contains(c))
+      graphicCharacter = predicate.Basic(c =>
+        c >= ' ' && c <= '~' && !Set('\\', '\'', '\"').contains(c)
+      )
     )
   )
   private val lexer = new Lexer(waccDesc)
