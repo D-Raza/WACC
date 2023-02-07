@@ -119,8 +119,8 @@ object AST {
   sealed trait WACCType {
     def equiv(that: WACCType): Boolean =
       (this, that) match {
-        case (_, AnyType())                         => true
-        case (AnyType(), _)                         => true
+        case (_, AnyType()) | (AnyType(), _)        => true
+        case (_, ErrorType()) | (ErrorType(), _)    => false
         case (ArrayType(thisTy), ArrayType(thatTy)) => thisTy equiv thatTy
         case (ArrayType(CharType()), StringType())  => true
         case (
@@ -133,39 +133,39 @@ object AST {
   }
 
   sealed trait Type extends WACCType {
-    def eraseInnerTypes: PairElemType =
-      this.asInstanceOf[PairElemType] // TODO: Hacky
+    def eraseInnerTypes: PairElemType
   }
   sealed trait PairElemType extends WACCType {
-    def asType: Type = this.asInstanceOf[Type] // TODO: Hacky
+    def asType: Type
   }
 
-  case class AnyType()(val pos: (Int, Int)) extends Type with PairElemType
+  sealed trait GenericType extends Type with PairElemType {
+    def asType: Type = this
+    def eraseInnerTypes: PairElemType = this
+  }
+
+  case class AnyType()(val pos: (Int, Int)) extends GenericType
+  case class ErrorType()(val pos: (Int, Int)) extends GenericType
 
   // Base Types
-  sealed trait BaseType extends Type with PairElemType
+  sealed trait BaseType extends GenericType
   case class IntType()(val pos: (Int, Int)) extends BaseType
   case class BoolType()(val pos: (Int, Int)) extends BaseType
   case class CharType()(val pos: (Int, Int)) extends BaseType
   case class StringType()(val pos: (Int, Int)) extends BaseType
 
   // Array Types
-  case class ArrayType(ty: Type)(val pos: (Int, Int))
-      extends Type
-      with PairElemType
+  case class ArrayType(ty: Type)(val pos: (Int, Int)) extends GenericType
 
   // Pair Types
   case class PairType(fstType: PairElemType, sndType: PairElemType)(
       val pos: (Int, Int)
   ) extends Type {
-    override def eraseInnerTypes: PairElemType = InnerPairType()(pos)
+    def eraseInnerTypes: PairElemType = InnerPairType()(pos)
   }
   case class InnerPairType()(val pos: (Int, Int)) extends PairElemType {
-    override def asType: Type =
-      PairType(AnyType()(NULLPOS), AnyType()(NULLPOS))(pos)
+    def asType: Type = PairType(AnyType()(NULLPOS), AnyType()(NULLPOS))(pos)
   }
-
-  case class ErrorType()(val pos: (Int, Int)) extends Type
 
   // Literals
   case class IntegerLiter(x: Int)(val pos: (Int, Int)) extends Expr
@@ -233,6 +233,7 @@ object AST {
 
   // Types
   object AnyType extends ParserBridgePos0[AnyType]
+  object ErrorType extends ParserBridgePos0[ErrorType]
   object ArrayType extends ParserBridgePos1[Type, ArrayType]
   object IntType extends ParserBridgePos0[IntType]
   object BoolType extends ParserBridgePos0[BoolType]
@@ -240,7 +241,6 @@ object AST {
   object StringType extends ParserBridgePos0[StringType]
   object PairType extends ParserBridgePos2[PairElemType, PairElemType, PairType]
   object InnerPairType extends ParserBridgePos0[InnerPairType]
-  object ErrorType extends ParserBridgePos0[ErrorType]
 
   // Literals
   object IntegerLiter extends ParserBridgePos1[Int, IntegerLiter]

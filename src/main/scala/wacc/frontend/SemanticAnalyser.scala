@@ -36,8 +36,6 @@ object SemanticAnalyser {
           )
         })
 
-        // println("Stats: " + stats)
-
         errors ++= checkStatSemantics(Map.empty[Ident, Type], stats, None)
       }
     }
@@ -55,36 +53,39 @@ object SemanticAnalyser {
     val errors: mutable.ListBuffer[String] = mutable.ListBuffer.empty
 
     val scopedSymbolTable: mutable.Map[Ident, Type] = mutable.Map.empty
+    implicit var curSymbolTable: Map[Ident, Type] =
+      symbolTable ++ scopedSymbolTable.toMap
 
     stats.foreach(stat => {
       stat match {
         case Skip() => ()
-        case Declare(ty, ident, rvalue) => {
-          if (
-            (symbolTable contains ident) || (scopedSymbolTable contains ident)
-          )
+
+        case d @ Declare(ty, ident, rvalue) => {
+          if (scopedSymbolTable contains ident)
             errors += "Redefined variable: " + ident.name
-          else
-            // TODO: add newly declared vars to symbol table
+          else {
             scopedSymbolTable += (ident -> ty)
-          val (rValueType, rValueErrors) = evalTypeOfRValue(rvalue, symbolTable)
-          errors.addAll(rValueErrors)
-          println("ty: " + ty)
-          println("rValueType: " + rValueType)
+            curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
+          }
+
+          val (rValueType, rValueErrors) = evalTypeOfRValue(rvalue)
+          errors ++= rValueErrors
           if (!(rValueType equiv ty))
             errors += f"Type mismatch: expected $ty, got $rValueType"
         }
+
         case Assign(lValue, rValue) => {
-          val (lValueType, lValueErrors) = evalTypeOfLValue(lValue, symbolTable)
-          val (rValueType, rValueErrors) = evalTypeOfRValue(rValue, symbolTable)
+          val (lValueType, lValueErrors) = evalTypeOfLValue(lValue)
+          val (rValueType, rValueErrors) = evalTypeOfRValue(rValue)
           errors ++= lValueErrors
           errors ++= rValueErrors
 
           if (!(lValueType equiv rValueType))
             errors += f"Type mismatch: expected $lValueType, got $rValueType"
         }
+
         case Read(lValue) => {
-          val (lValueType, lValueErrors) = evalTypeOfLValue(lValue, symbolTable)
+          val (lValueType, lValueErrors) = evalTypeOfLValue(lValue)
           errors ++= lValueErrors
 
           lValueType match {
@@ -95,7 +96,7 @@ object SemanticAnalyser {
         }
 
         case Free(expr) => {
-          val (exprType, exprTypeErrors) = evalTypeOfExpr(expr, symbolTable)
+          val (exprType, exprTypeErrors) = evalTypeOfExpr(expr)
           errors ++= exprTypeErrors
 
           exprType match {
@@ -106,7 +107,7 @@ object SemanticAnalyser {
         }
 
         case Return(expr) => {
-          val (exprType, exprTypeErrors) = evalTypeOfExpr(expr, symbolTable)
+          val (exprType, exprTypeErrors) = evalTypeOfExpr(expr)
           errors ++= exprTypeErrors
 
           (returnType, exprType) match {
@@ -118,7 +119,7 @@ object SemanticAnalyser {
         }
 
         case Exit(expr) => {
-          val (exprType, exprTypeErrors) = evalTypeOfExpr(expr, symbolTable)
+          val (exprType, exprTypeErrors) = evalTypeOfExpr(expr)
           errors ++= exprTypeErrors
           exprType match {
             case IntType() =>
@@ -127,33 +128,34 @@ object SemanticAnalyser {
         }
 
         case Print(expr) => {
-          val (exprType, exprTypeErrors) = evalTypeOfExpr(expr, symbolTable)
+          val (exprType, exprTypeErrors) = evalTypeOfExpr(expr)
           errors ++= exprTypeErrors
         }
 
         case Println(expr) => {
-          val (exprType, exprTypeErrors) = evalTypeOfExpr(expr, symbolTable)
+          val (exprType, exprTypeErrors) = evalTypeOfExpr(expr)
           errors ++= exprTypeErrors
         }
 
         case If(cond, thenStat, elseStat) => {
-          val (condType, condTypeErrors) = evalTypeOfExpr(cond, symbolTable)
+          val (condType, condTypeErrors) = evalTypeOfExpr(cond)
           errors ++= condTypeErrors
-          println("Condition type is: " + condType)
 
           condType match {
-            // case IntType() => println("Hello")
             case BoolType() => ()
             case _ => errors += f"Type mismatch: expected Bool, got $condType"
           }
 
+          curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
+
           errors ++= checkStatSemantics(
-            symbolTable ++ scopedSymbolTable,
+            curSymbolTable,
             thenStat,
             returnType
           )
+
           errors ++= checkStatSemantics(
-            symbolTable ++ scopedSymbolTable,
+            curSymbolTable,
             elseStat,
             returnType
           )
@@ -161,22 +163,27 @@ object SemanticAnalyser {
         }
 
         case While(cond, doStat) => {
-          val (condType, condTypeErrors) = evalTypeOfExpr(cond, symbolTable)
+          val (condType, condTypeErrors) = evalTypeOfExpr(cond)
           errors ++= condTypeErrors
           condType match {
             case BoolType() => ()
             case _ => errors += f"Type mismatch: expected Bool, got $condType"
           }
+
+          curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
+
           errors ++= checkStatSemantics(
-            symbolTable ++ scopedSymbolTable,
+            curSymbolTable,
             doStat,
             returnType
           )
         }
 
         case Scope(scopeStats) => {
+          curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
+
           errors ++= checkStatSemantics(
-            symbolTable ++ scopedSymbolTable,
+            curSymbolTable,
             scopeStats,
             returnType
           )
@@ -189,63 +196,78 @@ object SemanticAnalyser {
     errors.toList
   }
 
-  def evalTypeOfLValue(lValue: LValue, symbolTable: Map[Ident, Type])(implicit
-      funcTable: Map[Ident, (Type, List[Type])]
+  def evalTypeOfLValue(lValue: LValue)(implicit
+      funcTable: Map[Ident, (Type, List[Type])],
+      symbolTable: Map[Ident, Type]
   ): (Type, List[String]) = {
     val errors: mutable.ListBuffer[String] = mutable.ListBuffer.empty
 
     lValue match {
       case ident: Ident => {
-        if (!symbolTable.contains(ident))
-          (ErrorType, errors += f"Variable $ident not defined")
-
-        (symbolTable(ident), errors.toList)
+        (symbolTable get ident) match {
+          case Some(ty) => (ty, errors.toList)
+          case None =>
+            (
+              ErrorType()(NULLPOS),
+              (errors += f"Variable $ident not defined").toList
+            )
+        }
       }
       case ArrayElem(ident, xs) => {
-        if (!symbolTable.contains(ident))
-          (ErrorType, errors += f"Variable $ident not defined")
-
-        (symbolTable(ident), errors.toList)
+        (symbolTable get ident) match {
+          case Some(ArrayType(ty)) => (ty, errors.toList)
+          case Some(ty) =>
+            (
+              ErrorType()(NULLPOS),
+              (errors += f"Variable $ident is not an array").toList
+            )
+          case None =>
+            (
+              ErrorType()(NULLPOS),
+              (errors += f"Variable $ident not defined").toList
+            )
+        }
       }
       case Fst(l) => {
-        val (lValueType, lValueErrors) = evalTypeOfLValue(l, symbolTable)
+        val (lValueType, lValueErrors) = evalTypeOfLValue(l)
         errors ++= lValueErrors
         (lValueType, errors.toList)
       }
       case Snd(l) => {
-        val (lValueType, lValueErrors) = evalTypeOfLValue(l, symbolTable)
+        val (lValueType, lValueErrors) = evalTypeOfLValue(l)
         errors ++= lValueErrors
         (lValueType, errors.toList)
       }
     }
   }
 
-  def evalTypeOfRValue(rValue: RValue, symbolTable: Map[Ident, Type])(implicit
-      funcTable: Map[Ident, (Type, List[Type])]
+  def evalTypeOfRValue(rValue: RValue)(implicit
+      funcTable: Map[Ident, (Type, List[Type])],
+      symbolTable: Map[Ident, Type]
   ): (Type, List[String]) = {
     val errors: mutable.ListBuffer[String] = mutable.ListBuffer.empty
 
     rValue match {
-      case expr: Expr => evalTypeOfExpr(expr, symbolTable)
+      case expr: Expr => evalTypeOfExpr(expr)
       case arrayLit @ ArrayLit(xs) => {
         xs match {
           case Nil =>
             (ArrayType(AnyType()(NULLPOS))(arrayLit.pos), errors.toList)
           case xs @ (head :: tail) => {
             val (expectedArrElemType, headErrors) =
-              evalTypeOfExpr(head, symbolTable)
+              evalTypeOfExpr(head)
             errors ++= headErrors
 
             val (actualArrElemType, tailErrors) =
-              checkExprs(tail, expectedArrElemType, symbolTable)
+              checkExprs(tail, expectedArrElemType)
             errors ++= tailErrors
-            (actualArrElemType, errors.toList)
+            (ArrayType(actualArrElemType)(arrayLit.pos), errors.toList)
           }
         }
       }
       case NewPair(fst, snd) => {
-        val (fstType, fstErrors) = evalTypeOfExpr(fst, symbolTable)
-        val (sndType, sndErrors) = evalTypeOfExpr(snd, symbolTable)
+        val (fstType, fstErrors) = evalTypeOfExpr(fst)
+        val (sndType, sndErrors) = evalTypeOfExpr(snd)
         errors ++= fstErrors
         errors ++= sndErrors
         (
@@ -254,28 +276,35 @@ object SemanticAnalyser {
         )
       }
       case Call(f, args) => {
-        if (!funcTable.contains(f))
-          (ErrorType, errors += f"Function $f not defined")
+        (funcTable get f) match {
+          case Some((returnType, paramTypes)) => {
+            val (argTypes, argErrors) =
+              args.map(evalTypeOfExpr(_)).unzip
+            errors ++= argErrors.flatten
 
-        val (argTypes, argErrors) =
-          args.map(evalTypeOfExpr(_, symbolTable)).unzip
-        errors ++= argErrors.flatten
+            val (returnType, paramTypes) = funcTable(f)
+            if (argTypes.length != paramTypes.length)
+              errors += f"Function $f called with ${argTypes.length} arguments, expected ${paramTypes.length}"
 
-        val (returnType, paramTypes) = funcTable(f)
-        if (argTypes.length != paramTypes.length)
-          errors += f"Function $f called with ${argTypes.length} arguments, expected ${paramTypes.length}"
+            argTypes.zip(paramTypes).foreach {
+              case (argType, paramType) => {
+                if (!argType.equals(paramType))
+                  errors += f"Function $f called with argument of type $argType, expected $paramType"
+              }
+            }
 
-        argTypes.zip(paramTypes).foreach {
-          case (argType, paramType) => {
-            if (!argType.equals(paramType))
-              errors += f"Function $f called with argument of type $argType, expected $paramType"
+            (returnType, errors.toList)
           }
+          case None =>
+            (
+              ErrorType()(NULLPOS),
+              (errors += f"Function $f not defined").toList
+            )
         }
 
-        (returnType, errors.toList)
       }
       case Fst(lValue) => {
-        val (exprType, error) = evalTypeOfLValue(lValue, symbolTable)
+        val (exprType, error) = evalTypeOfLValue(lValue)
         errors ++= error
         exprType match {
           case PairType(fstType, _) => (fstType.asType, errors.toList)
@@ -283,7 +312,7 @@ object SemanticAnalyser {
         }
       }
       case Snd(lValue) => {
-        val (exprType, error) = evalTypeOfLValue(lValue, symbolTable)
+        val (exprType, error) = evalTypeOfLValue(lValue)
         errors ++= error
         exprType match {
           case PairType(_, sndType) => (sndType.asType, errors.toList)
@@ -294,9 +323,8 @@ object SemanticAnalyser {
   }
 
   def evalTypeOfExpr(
-      expr: Expr,
-      symbolTable: Map[Ident, Type]
-  ): (Type, List[String]) = {
+      expr: Expr
+  )(implicit symbolTable: Map[Ident, Type]): (Type, List[String]) = {
     expr match {
       case intLit: IntegerLiter => (IntType()(intLit.pos), Nil)
       case boolLit: BoolLiter   => (BoolType()(boolLit.pos), Nil)
@@ -316,51 +344,95 @@ object SemanticAnalyser {
           (ErrorType()(NULLPOS), List("Undeclared variable: " + ident.name))
         }
       }
-      case ArrayElem(ident, xs) =>
-        checkExprs(xs, IntType()(NULLPOS), symbolTable)
-      case not: Not    => checkExprType(not, BoolType()(not.pos), symbolTable)
-      case neg: Negate => checkExprType(neg, IntType()(neg.pos), symbolTable)
-      case len: Len =>
-        checkExprType(len, ArrayType(AnyType()(len.pos))(len.pos), symbolTable)
-      case ord: Ord => checkExprType(ord, CharType()(ord.pos), symbolTable)
-      case chr: Chr => checkExprType(chr, IntType()(chr.pos), symbolTable)
+      case ArrayElem(ident, xs) => {
+        def getArrayTypeRank(ty: Type): Int = {
+          ty match {
+            case ArrayType(innerTy) => 1 + getArrayTypeRank(innerTy)
+            case _                  => 0
+          }
+        }
+
+        checkExprs(xs, IntType()(NULLPOS)) match {
+          case (IntType(), errors) => {
+            symbolTable get ident match {
+              case Some(t @ ArrayType(_)) => {
+                if (getArrayTypeRank(t) == xs.length)
+                  (t, errors)
+                else
+                  (ErrorType()(NULLPOS), List("Array dimension mismatch"))
+              }
+              case Some(_) =>
+                (ErrorType()(NULLPOS), errors :+ "Variable is not an array")
+              case None =>
+                (ErrorType()(NULLPOS), errors :+ "Variable not defined")
+            }
+          }
+          case (t, errors) =>
+            (ErrorType()(NULLPOS), errors :+ "Array index is not an integer")
+        }
+      }
+      case not @ Not(x)    => checkExprType(x, BoolType()(not.pos))
+      case neg @ Negate(x) => checkExprType(x, IntType()(neg.pos))
+      case len @ Len(x) =>
+        checkExprType(x, ArrayType(AnyType()(len.pos))(len.pos))
+      case ord @ Ord(x) => checkExprType(x, CharType()(ord.pos))
+      case chr @ Chr(x) => checkExprType(x, IntType()(chr.pos))
       case mul @ Mult(x, y) =>
-        check2ExprType(x, y, IntType()(mul.pos), symbolTable)
+        check2ExprType(Set(IntType()(NULLPOS)), x, y, IntType()(mul.pos))
       case div @ Div(x, y) =>
-        check2ExprType(x, y, IntType()(div.pos), symbolTable)
+        check2ExprType(Set(IntType()(NULLPOS)), x, y, IntType()(div.pos))
       case mod @ Mod(x, y) =>
-        check2ExprType(x, y, IntType()(mod.pos), symbolTable)
+        check2ExprType(Set(IntType()(NULLPOS)), x, y, IntType()(mod.pos))
       case add @ Add(x, y) =>
-        check2ExprType(x, y, IntType()(add.pos), symbolTable)
+        check2ExprType(Set(IntType()(NULLPOS)), x, y, IntType()(add.pos))
       case sub @ Sub(x, y) =>
-        check2ExprType(x, y, IntType()(sub.pos), symbolTable)
+        check2ExprType(Set(IntType()(NULLPOS)), x, y, IntType()(sub.pos))
       case eq @ Equal(x, y) =>
-        check2ExprType(x, y, IntType()(eq.pos), symbolTable)
+        check2ExprType(Set(AnyType()(NULLPOS)), x, y, BoolType()(eq.pos))
       case neq @ NotEqual(x, y) =>
-        check2ExprType(x, y, IntType()(neq.pos), symbolTable)
+        check2ExprType(Set(AnyType()(NULLPOS)), x, y, BoolType()(neq.pos))
       case lt @ LT(x, y) =>
-        check2ExprType(x, y, IntType()(lt.pos), symbolTable)
+        check2ExprType(
+          Set(IntType()(NULLPOS), CharType()(NULLPOS)),
+          x,
+          y,
+          BoolType()(lt.pos)
+        )
       case lte @ LTE(x, y) =>
-        check2ExprType(x, y, IntType()(lte.pos), symbolTable)
+        check2ExprType(
+          Set(IntType()(NULLPOS), CharType()(NULLPOS)),
+          x,
+          y,
+          BoolType()(lte.pos)
+        )
       case and @ And(x, y) =>
-        check2ExprType(x, y, BoolType()(and.pos), symbolTable)
+        check2ExprType(Set(BoolType()(NULLPOS)), x, y, BoolType()(and.pos))
       case or @ Or(x, y) =>
-        check2ExprType(x, y, BoolType()(or.pos), symbolTable)
+        check2ExprType(Set(BoolType()(NULLPOS)), x, y, BoolType()(or.pos))
       case gt @ GT(x, y) =>
-        check2ExprType(x, y, IntType()(gt.pos), symbolTable)
+        check2ExprType(
+          Set(IntType()(NULLPOS), CharType()(NULLPOS)),
+          x,
+          y,
+          BoolType()(gt.pos)
+        )
       case gte @ GTE(x, y) =>
-        check2ExprType(x, y, IntType()(gte.pos), symbolTable)
-      case Bracket(x) => evalTypeOfExpr(x, symbolTable)
+        check2ExprType(
+          Set(IntType()(NULLPOS), CharType()(NULLPOS)),
+          x,
+          y,
+          BoolType()(gte.pos)
+        )
+      case Bracket(x) => evalTypeOfExpr(x)
     }
   }
 
   // Check that an expression is of a certain type
   private def checkExprType(
       expr: Expr,
-      expectedType: Type,
-      symbolTable: Map[Ident, Type]
-  ): (Type, List[String]) = {
-    val (exprType, error) = evalTypeOfExpr(expr, symbolTable)
+      expectedType: Type
+  )(implicit symbolTable: Map[Ident, Type]): (Type, List[String]) = {
+    val (exprType, error) = evalTypeOfExpr(expr)
 
     if (exprType equiv expectedType) {
       (expectedType, error)
@@ -374,42 +446,59 @@ object SemanticAnalyser {
 
   // Check that two expressions are of the same expected type
   private def check2ExprType(
+      argTypes: Set[Type],
       expr1: Expr,
       expr2: Expr,
-      expectedType: Type,
+      retType: Type
+  )(implicit
       symbolTable: Map[Ident, Type]
   ): (Type, List[String]) = {
-    val (expr1Type, error1) = evalTypeOfExpr(expr1, symbolTable)
-    val (expr2Type, error2) = evalTypeOfExpr(expr2, symbolTable)
+    val (expr1Type, error1) = evalTypeOfExpr(expr1)
+    val (expr2Type, error2) = evalTypeOfExpr(expr2)
     val errors = error1 ++ error2
-    if ((expr1Type equiv expectedType) && (expr2Type equiv expectedType)) {
-      (expectedType, errors)
-    } else {
+
+    if (!argTypes.exists(expr1Type equiv _)) {
       (
         ErrorType()(NULLPOS),
-        errors :+ f"Expected type $expectedType but got $expr1Type and $expr2Type instead"
+        errors :+ f"Expected type of arg1 to be one of $argTypes but got $expr1Type instead"
       )
+    } else if (!argTypes.exists(expr2Type equiv _)) {
+      (
+        ErrorType()(NULLPOS),
+        errors :+ f"Expected type of arg2 to be one of $argTypes but got $expr2Type instead"
+      )
+    } else if (!((expr1Type equiv expr2Type) || (expr2Type equiv expr1Type))) {
+      (
+        ErrorType()(NULLPOS),
+        errors :+ f"Expected arg1 and arg2 to have the same type but got $expr1Type and $expr2Type instead"
+      )
+    } else {
+      (retType, errors)
     }
   }
 
   // Check that a list of expressions are of a certain type
   private def checkExprs(
       exprs: List[Expr],
-      expectedType: Type,
-      symbolTable: Map[Ident, Type]
-  ): (Type, List[String]) = {
-    val evals = exprs.map(checkExprType(_, expectedType, symbolTable))
-    val types = evals.map(_._1)
-    val errors = evals.flatMap(_._2)
-    if (types.distinct.length == 1 && (types.head equiv expectedType)) {
-      (types.head, errors)
-    } else {
-      (
-        (
-          ErrorType()(NULLPOS),
-          errors :+ f"Expected type $expectedType but got $types instead"
-        )
-      )
+      expectedType: Type
+  )(implicit symbolTable: Map[Ident, Type]): (Type, List[String]) = {
+    exprs match {
+      case Nil => (expectedType, Nil)
+      case _ => {
+        val evals = exprs.map(checkExprType(_, expectedType))
+        val types = evals.map(_._1)
+        val errors = evals.flatMap(_._2)
+        if (types.distinct.length == 1 && (types.head equiv expectedType)) {
+          (types.head, errors)
+        } else {
+          (
+            (
+              ErrorType()(NULLPOS),
+              errors :+ f"Expected type $expectedType but got $types instead"
+            )
+          )
+        }
+      }
     }
   }
 

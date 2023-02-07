@@ -9,11 +9,13 @@ import parsley.token.descriptions.{LexicalDesc, NameDesc, SpaceDesc, SymbolDesc}
 import parsley.token.descriptions.numeric.{ExponentDesc, NumericDesc}
 import parsley.token.descriptions.text.{EscapeDesc, TextDesc}
 import parsley.token.predicate
+import parsley.character.isWhitespace
 
 object Lexer {
   private val waccDesc = LexicalDesc.plain.copy(
     spaceDesc = SpaceDesc.plain.copy(
-      commentLine = "#"
+      commentLine = "#",
+      space = predicate.Basic(isWhitespace)
     ),
     symbolDesc = SymbolDesc.plain.copy(
       hardKeywords = Set(
@@ -94,12 +96,17 @@ object Lexer {
         )
       ),
       graphicCharacter =
-        predicate.Basic(c => c >= ' ' && !Set('\\', '\'', '\"').contains(c))
+        predicate.Basic(c => c >= ' ' && c <= '~' && !Set('\\', '\'', '\"').contains(c))
     )
   )
   private val lexer = new Lexer(waccDesc)
 
   val VAR_ID: Parsley[String] = lexer.lexeme.names.identifier
+
+  // private val BIGINT: Parsley[BigInt] =
+  //   lexer.lexeme.numeric.integer.decimal.filter(_.isValidInt)
+  // val INTEGER: Parsley[Int] =
+  //   BIGINT.map(_.intValue)
 
   val INTEGER: Parsley[Int] =
     lexer.lexeme.numeric.integer.decimal32.label("integer")
