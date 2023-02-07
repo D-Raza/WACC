@@ -229,14 +229,24 @@ object SemanticAnalyser {
         }
       }
       case Fst(l) => {
-        val (lValueType, lValueErrors) = evalTypeOfLValue(l)
-        errors ++= lValueErrors
-        (lValueType, errors.toList)
+        evalTypeOfLValue(l) match {
+          case (PairType(fstTy, _), lValueErrors) => (fstTy.asType, lValueErrors)
+          case (ty, lValueErrors) =>
+            (
+              ErrorType()(NULLPOS),
+              (errors ++= lValueErrors += f"Variable $l is not a pair").toList
+            )
+        }
       }
       case Snd(l) => {
-        val (lValueType, lValueErrors) = evalTypeOfLValue(l)
-        errors ++= lValueErrors
-        (lValueType, errors.toList)
+        evalTypeOfLValue(l) match {
+          case (PairType(_, sndTy), lValueErrors) => (sndTy.asType, lValueErrors)
+          case (ty, lValueErrors) =>
+            (
+              ErrorType()(NULLPOS),
+              (errors ++= lValueErrors += f"Variable $l is not a pair").toList
+            )
+        }
       }
     }
   }
