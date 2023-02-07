@@ -36,6 +36,8 @@ object SemanticAnalyser {
           )
         })
 
+        // println("Stats: " + stats)
+
         errors ++= checkStatSemantics(Map.empty[Ident, Type], stats, None)
       }
     }
@@ -52,26 +54,34 @@ object SemanticAnalyser {
   ): List[String] = {
     val errors: mutable.ListBuffer[String] = mutable.ListBuffer.empty
 
+    val scopedSymbolTable: mutable.Map[Ident, Type] = mutable.Map.empty
+
     stats.foreach(stat => {
       stat match {
         case Skip() => ()
         case Declare(ty, ident, rvalue) => {
-          if (!(symbolTable contains ident))
+          if (
+            (symbolTable contains ident) || (scopedSymbolTable contains ident)
+          )
             errors += "Redefined variable: " + ident.name
-
-          // TODO: add newly declared vars to symbol table
+          else
+            // TODO: add newly declared vars to symbol table
+            scopedSymbolTable += (ident -> ty)
           val (rValueType, rValueErrors) = evalTypeOfRValue(rvalue, symbolTable)
           errors.addAll(rValueErrors)
+          println("ty: " + ty)
+          println("rValueType: " + rValueType)
           if (!(rValueType equiv ty))
-            errors :+ f"Type mismatch: expected $ty, got $rValueType"
+            errors += f"Type mismatch: expected $ty, got $rValueType"
         }
         case Assign(lValue, rValue) => {
           val (lValueType, lValueErrors) = evalTypeOfLValue(lValue, symbolTable)
           val (rValueType, rValueErrors) = evalTypeOfRValue(rValue, symbolTable)
           errors ++= lValueErrors
           errors ++= rValueErrors
+
           if (!(lValueType equiv rValueType))
-            errors :+ f"Type mismatch: expected $lValueType, got $rValueType"
+            errors += f"Type mismatch: expected $lValueType, got $rValueType"
         }
         case Read(lValue) => {
           val (lValueType, lValueErrors) = evalTypeOfLValue(lValue, symbolTable)
@@ -80,7 +90,7 @@ object SemanticAnalyser {
           lValueType match {
             case IntType() | CharType() => ()
             case _ =>
-              errors :+ f"Type mismatch: expected Int or Char, got $lValueType"
+              errors += f"Type mismatch: expected Int or Char, got $lValueType"
           }
         }
 
@@ -91,7 +101,7 @@ object SemanticAnalyser {
           exprType match {
             case PairType(_, _) | ArrayType(_) =>
             case _ =>
-              errors :+ f"Type mismatch: expected Array or Pair, got $exprType"
+              errors += f"Type mismatch: expected Array or Pair, got $exprType"
           }
         }
 
@@ -102,8 +112,8 @@ object SemanticAnalyser {
           (returnType, exprType) match {
             case (Some(returnType), exprType) =>
               if (!(returnType equiv exprType))
-                errors :+ f"Type mismatch: expected $returnType, got $exprType"
-            case (None, _) => errors :+ "Return statement outside function"
+                errors += f"Type mismatch: expected $returnType, got $exprType"
+            case (None, _) => errors += "Return statement outside function"
           }
         }
 
@@ -112,7 +122,7 @@ object SemanticAnalyser {
           errors ++= exprTypeErrors
           exprType match {
             case IntType() =>
-            case _ => errors :+ f"Type mismatch: expected Int, got $exprType"
+            case _ => errors += f"Type mismatch: expected Int, got $exprType"
           }
         }
 
@@ -129,13 +139,24 @@ object SemanticAnalyser {
         case If(cond, thenStat, elseStat) => {
           val (condType, condTypeErrors) = evalTypeOfExpr(cond, symbolTable)
           errors ++= condTypeErrors
+          println("Condition type is: " + condType)
+
           condType match {
-            case BoolType() =>
-            case _ => errors :+ f"Type mismatch: expected Bool, got $condType"
+            // case IntType() => println("Hello")
+            case BoolType() => ()
+            case _ => errors += f"Type mismatch: expected Bool, got $condType"
           }
 
-          errors ++= checkStatSemantics(symbolTable, thenStat, returnType)
-          errors ++= checkStatSemantics(symbolTable, elseStat, returnType)
+          errors ++= checkStatSemantics(
+            symbolTable ++ scopedSymbolTable,
+            thenStat,
+            returnType
+          )
+          errors ++= checkStatSemantics(
+            symbolTable ++ scopedSymbolTable,
+            elseStat,
+            returnType
+          )
 
         }
 
@@ -143,15 +164,19 @@ object SemanticAnalyser {
           val (condType, condTypeErrors) = evalTypeOfExpr(cond, symbolTable)
           errors ++= condTypeErrors
           condType match {
-            case BoolType() =>
-            case _ => errors :+ f"Type mismatch: expected Bool, got $condType"
+            case BoolType() => ()
+            case _ => errors += f"Type mismatch: expected Bool, got $condType"
           }
-          errors ++= checkStatSemantics(symbolTable, doStat, returnType)
+          errors ++= checkStatSemantics(
+            symbolTable ++ scopedSymbolTable,
+            doStat,
+            returnType
+          )
         }
 
         case Scope(scopeStats) => {
           errors ++= checkStatSemantics(
-            symbolTable,
+            symbolTable ++ scopedSymbolTable,
             scopeStats,
             returnType
           )
@@ -172,13 +197,13 @@ object SemanticAnalyser {
     lValue match {
       case ident: Ident => {
         if (!symbolTable.contains(ident))
-          (ErrorType, errors :+ f"Variable $ident not defined")
+          (ErrorType, errors += f"Variable $ident not defined")
 
         (symbolTable(ident), errors.toList)
       }
       case ArrayElem(ident, xs) => {
         if (!symbolTable.contains(ident))
-          (ErrorType, errors :+ f"Variable $ident not defined")
+          (ErrorType, errors += f"Variable $ident not defined")
 
         (symbolTable(ident), errors.toList)
       }
@@ -230,7 +255,7 @@ object SemanticAnalyser {
       }
       case Call(f, args) => {
         if (!funcTable.contains(f))
-          (ErrorType, errors :+ f"Function $f not defined")
+          (ErrorType, errors += f"Function $f not defined")
 
         val (argTypes, argErrors) =
           args.map(evalTypeOfExpr(_, symbolTable)).unzip
@@ -238,12 +263,12 @@ object SemanticAnalyser {
 
         val (returnType, paramTypes) = funcTable(f)
         if (argTypes.length != paramTypes.length)
-          errors :+ f"Function $f called with ${argTypes.length} arguments, expected ${paramTypes.length}"
+          errors += f"Function $f called with ${argTypes.length} arguments, expected ${paramTypes.length}"
 
         argTypes.zip(paramTypes).foreach {
           case (argType, paramType) => {
             if (!argType.equals(paramType))
-              errors :+ f"Function $f called with argument of type $argType, expected $paramType"
+              errors += f"Function $f called with argument of type $argType, expected $paramType"
           }
         }
 
