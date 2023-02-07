@@ -47,14 +47,14 @@ object Lexer {
         "pair",
         "true",
         "false",
-        "null"
+        "null",
+        "len",
+        "ord",
+        "chr",
       ),
       hardOperators = Set(
         "!",
         "-",
-        "len",
-        "ord",
-        "chr",
         "*",
         "/",
         "%",

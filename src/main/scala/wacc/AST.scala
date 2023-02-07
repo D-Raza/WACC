@@ -30,13 +30,6 @@ object genericbridgesPos {
     override final def con(pos: (Int, Int)): (A, B) => C = this.apply(_, _)(pos)
   }
 
-  // trait ParserBridgeCurriedFlippedPos2[A, B, C]
-  //     extends ParserSingletonBridgePos[A => B => C] {
-  //   def apply(x: A, y: B)(pos: (Int, Int)): C
-  //   override final def con(pos: (Int, Int)): A => B => C =
-  //     x => y => this.apply(x, y)(pos)
-  // }
-
   trait ParserBridgePos3[-A, -B, -C, +D]
       extends ParserSingletonBridgePos[(A, B, C) => D] {
     def apply(x: A, y: B, z: C)(pos: (Int, Int)): D
@@ -120,6 +113,7 @@ object AST {
     def equiv(that: WACCType): Boolean =
       (this, that) match {
         case (_, AnyType()) | (AnyType(), _)        => true
+        case (_, UnknownType()) | (UnknownType(), _) => true
         case (_, ErrorType()) | (ErrorType(), _)    => false
         case (ArrayType(thisTy), ArrayType(thatTy)) => thisTy equiv thatTy
         case (ArrayType(CharType()), StringType())  => true
@@ -146,6 +140,7 @@ object AST {
 
   case class AnyType()(val pos: (Int, Int)) extends GenericType
   case class ErrorType()(val pos: (Int, Int)) extends GenericType
+  case class UnknownType()(val pos: (Int, Int)) extends GenericType
 
   // Base Types
   sealed trait BaseType extends GenericType
@@ -164,7 +159,7 @@ object AST {
     def eraseInnerTypes: PairElemType = InnerPairType()(pos)
   }
   case class InnerPairType()(val pos: (Int, Int)) extends PairElemType {
-    def asType: Type = PairType(AnyType()(NULLPOS), AnyType()(NULLPOS))(pos)
+    def asType: Type = PairType(UnknownType()(NULLPOS), UnknownType()(NULLPOS))(pos)
   }
 
   // Literals
@@ -234,6 +229,7 @@ object AST {
   // Types
   object AnyType extends ParserBridgePos0[AnyType]
   object ErrorType extends ParserBridgePos0[ErrorType]
+  object UnknownType extends ParserBridgePos0[UnknownType]
   object ArrayType extends ParserBridgePos1[Type, ArrayType]
   object IntType extends ParserBridgePos0[IntType]
   object BoolType extends ParserBridgePos0[BoolType]

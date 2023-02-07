@@ -80,6 +80,11 @@ object SemanticAnalyser {
           errors ++= lValueErrors
           errors ++= rValueErrors
 
+          (lValueType, rValueType) match {
+            case (UnknownType(), UnknownType()) => errors += f"Type mismatch: unknown types in assignment"
+            case _ =>
+          }
+
           if (!(lValueType equiv rValueType))
             errors += f"Type mismatch: expected $lValueType, got $rValueType"
         }
