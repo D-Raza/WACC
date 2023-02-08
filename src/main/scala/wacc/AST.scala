@@ -189,7 +189,7 @@ object AST {
 
   // Unary operators
   case class Not(x: Expr)(val pos: (Int, Int)) extends Expr
-  case class Negate(x: Expr)(val pos: (Int, Int)) extends Expr
+  case class Neg(x: Expr)(val pos: (Int, Int)) extends Expr
   case class Len(x: Expr)(val pos: (Int, Int)) extends Expr
   case class Ord(x: Expr)(val pos: (Int, Int)) extends Expr
   case class Chr(x: Expr)(val pos: (Int, Int)) extends Expr
@@ -263,7 +263,7 @@ object AST {
 
   // Unary operators
   object Not extends ParserBridgePos1[Expr, Expr]
-  object Negate extends ParserBridgePos1[Expr, Expr]
+  object Neg extends ParserBridgePos1[Expr, Expr]
   object Len extends ParserBridgePos1[Expr, Expr]
   object Ord extends ParserBridgePos1[Expr, Expr]
   object Chr extends ParserBridgePos1[Expr, Expr]

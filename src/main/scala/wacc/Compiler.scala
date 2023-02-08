@@ -31,8 +31,7 @@ object Compiler {
       System.exit(-1)
     }
 
-    // DEBUG
-    Source.fromFile(inputFile).getLines().foreach(println);
+    Source.fromFile(inputFile).getLines().foreach(println); // DEBUG
 
     // Frontend
     println("Compiling...")
@@ -42,7 +41,7 @@ object Compiler {
 
     parseResult match {
       case Success(x) => {
-        println(x)
+        println(x) // DEBUG
         val errors = checkProgramSemantics(x)
         if (errors.isEmpty) {
           println("No errors found!")

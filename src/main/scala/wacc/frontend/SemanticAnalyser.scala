@@ -411,7 +411,7 @@ object SemanticAnalyser {
       }
       case not @ Not(x) =>
         checkExprType(x, BoolType()(not.pos), BoolType()(not.pos))
-      case neg @ Negate(x) =>
+      case neg @ Neg(x) =>
         checkExprType(x, IntType()(neg.pos), IntType()(neg.pos))
       case len @ Len(x) =>
         checkExprType(
