@@ -13,16 +13,17 @@ object errors {
       line: String,
       linesBefore: Seq[String],
       linesAfter: Seq[String],
-      errorPointsAt: Int
+      errorPointsAt: Int,
+      errorWidth: Int
   ) {
     private val errorLineStart = ">"
-    private def errorPointer(caretAt: Int) = s"${" " * caretAt}^"
+    private def errorPointer(caretAt: Int, errorWidth: Int) = s"${" " * caretAt}${"^" * errorWidth}"
 
     def genErrorInfo: String = {
       (linesBefore.map(line => s"$errorLineStart$line") ++:
         Seq(
           s"$errorLineStart$line",
-          s"${" " * errorLineStart.length}${errorPointer(errorPointsAt)}"
+          s"${" " * errorLineStart.length}${errorPointer(errorPointsAt, errorWidth)}"
         ) ++:
         linesAfter.map(line => s"$errorLineStart$line")).mkString("\n")
     }
@@ -34,7 +35,8 @@ object errors {
       val sourceLines = Source.fromFile(source).getLines().toArray
       val lineBefore = if (line > 1) sourceLines(line - 2) else ""
       val lineAfter = if (line < sourceLines.length) sourceLines(line) else ""
-      WACCLineInfo(sourceLines(line - 1), Seq(lineBefore), Seq(lineAfter), col)
+      val errorWidth = 1
+      WACCLineInfo(sourceLines(line - 1), Seq(lineBefore), Seq(lineAfter), col, errorWidth)
     }
   }
 
@@ -341,7 +343,7 @@ object errors {
         linesAfter: Seq[String],
         errorPointsAt: Int,
         errorWidth: Int
-    ): LineInfo = WACCLineInfo(line, linesBefore, linesAfter, errorPointsAt)
+    ): LineInfo = WACCLineInfo(line, linesBefore, linesAfter, errorPointsAt, errorWidth)
 
     override val numLinesBefore: Int = 1
 
