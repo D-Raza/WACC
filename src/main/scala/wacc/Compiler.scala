@@ -42,6 +42,7 @@ object Compiler {
     parseResult match {
       case Success(x) => {
         println(x) // DEBUG
+        implicit val source: File = inputFile
         val errors = checkProgramSemantics(x)
         if (errors.isEmpty) {
           println("No errors found!")
