@@ -105,7 +105,7 @@ object Lexer {
 
   val VAR_ID: Parsley[String] = lexer.lexeme.names.identifier
   val NEGATE: Parsley[Unit] =
-    lexer.lexeme(attempt(("-") *> notFollowedBy(digit))).label("neg")
+    lexer.lexeme(attempt(("-") *> notFollowedBy(digit))).hide
   val INTEGER: Parsley[Int] =
     lexer.lexeme.numeric.integer.decimal32.label("integer")
   val BOOL: Parsley[Boolean] =

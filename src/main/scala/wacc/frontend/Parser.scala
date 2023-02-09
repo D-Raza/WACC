@@ -3,15 +3,21 @@ package wacc.frontend
 import wacc.frontend.Lexer._
 import wacc.frontend.Lexer.implicits.implicitSymbol
 import wacc.AST._
+import wacc.frontend.errors._
 import java.io.File
 import parsley.Parsley._
 import parsley.{Parsley, Result}
+import parsley.errors.combinator._
 import parsley.combinator.{some, many, sepBy, sepBy1}
 import parsley.expr._
 import parsley.io.ParseFromIO
 
 object Parser {
-  def parse(input: File): Result[String, Program] =
+
+  implicit val waccErrorBuilder: WACCErrorBuilder =
+    new WACCErrorBuilder
+
+  def parse(input: File): Result[WACCError, Program] =
     `<program>`.parseFromFile(input).get
 
   // <program> ::= 'begin' <func>* <stat> 'end'
@@ -84,7 +90,7 @@ object Parser {
       <|> Scope(
         "begin" *> sepBy1(`<stat>`, ";") <* "end"
       )
-  )
+  ).label("statement")
 
   // <lvalue> ::= <ident> | <array-elem> | <pair-elem>
   private lazy val `<lvalue>` : Parsley[LValue] = (
@@ -102,8 +108,12 @@ object Parser {
     `<expr>`
       <|> `<array-liter>`
       <|> NewPair("newpair" *> "(" *> `<expr>` <* ",", `<expr>` <* ")")
-      <|> `<pair-elem>`
+        .label("pair instantiation")
+      <|> `<pair-elem>`.label("pair element").explain(
+        "pair elements may be accessed with fst or snd"
+      )
       <|> Call("call" *> `<ident>`, "(" *> `<arg-list>` <* ")")
+        .label("function call")
   )
 
   // <arg-list> ::= <expr> (‘,’ <expr>)*
@@ -112,6 +122,10 @@ object Parser {
   // <type> ::= <base-type> | <array-type> | <pair-type>
   private lazy val `<type>` = chain
     .postfix(`<base-type>` <|> `<pair-type>`, `<array-type>`)
+    .label("type")
+    .explain(
+      "valid types are int, bool, char, string, pair, and arrays of any of these types"
+    )
 
   // <base-type> ::= 'int' | 'bool' | 'char' | 'string'
   private lazy val `<base-type>` = (
@@ -122,7 +136,7 @@ object Parser {
   )
 
   // <array-type> ::= <type> '[' ']'
-  private lazy val `<array-type>` = ArrayType <# "[]" // ("[" <* "]")
+  private lazy val `<array-type>` = ArrayType <# "[]"
 
   // <pair-type> ::= ‘pair’ ‘(’ <pair-elem-type> ‘,’ <pair-elem-type> ‘)’
   private lazy val `<pair-type>` = PairType(
@@ -139,30 +153,30 @@ object Parser {
     SOps(InfixR)(Or <# "||") +:
       SOps(InfixR)(And <# "&&") +:
       SOps(InfixN)(
-        Equal <# "==",
-        NotEqual <# "!="
+        Equal <# "==".label("operator"),
+        NotEqual <# "!=".label("operator")
       )
       +: SOps(InfixN)(
-        LT <# "<",
-        LTE <# "<=",
-        GT <# ">",
-        GTE <# ">="
+        LT <# "<".label("operator"),
+        LTE <# "<=".label("operator"),
+        GT <# ">".label("operator"),
+        GTE <# ">=".label("operator")
       )
       +: SOps(InfixL)(
-        Add <# "+",
-        Sub <# "-"
+        Add <# "+".label("operator"),
+        Sub <# "-".label("operator")
       )
       +: SOps(InfixL)(
-        Mult <# "*",
-        Div <# "/",
-        Mod <# "%"
+        Mult <# "*".label("operator"),
+        Div <# "/".label("operator"),
+        Mod <# "%".label("operator")
       )
       +: SOps(Prefix)(
-        Not <# "!",
-        Negate <# NEGATE,
-        Len <# "len",
-        Ord <# "ord",
-        Chr <# "chr"
+        Not <# "!".label("operator"),
+        Neg <# NEGATE,
+        Len <# "len".label("operator"),
+        Ord <# "ord".label("operator"),
+        Chr <# "chr".label("operator")
       )
       +: Atoms(
         IntegerLiter(INTEGER),
@@ -181,11 +195,12 @@ object Parser {
 
   // <array-elem> ::= <ident> ('[' <expr> ']')+
   private lazy val `<array-elem>` =
-    ArrayElem(`<ident>`, some("[" *> `<expr>` <* "]"))
+    ArrayElem(`<ident>`, some("[" *> `<expr>`.label("index") <* "]"))
+      .label("array element")
 
   // <array-liter> ::= '[' (<expr> (',' <expr>)*)? ']'
   private lazy val `<array-liter>` = ArrayLit(
     "[" *> sepBy(`<expr>`, ",") <* "]"
-  )
+  ).label("array literal")
 
 }

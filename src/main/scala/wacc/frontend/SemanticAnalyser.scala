@@ -1,19 +1,23 @@
 package wacc.frontend
 
 import wacc.AST._
+import wacc.frontend.errors._
+import java.io.File
 import scala.collection.mutable
 
 object SemanticAnalyser {
 
-  def checkProgramSemantics(program: Program): List[String] = {
-    val errors: mutable.ListBuffer[String] = mutable.ListBuffer.empty
+  def checkProgramSemantics(
+      program: Program
+  )(implicit source: File): List[WACCError] = {
+    val errors: mutable.ListBuffer[WACCError] = mutable.ListBuffer.empty
     val functionDefs: mutable.Map[Ident, (Type, List[Type])] = mutable.Map.empty
 
     program match {
       case Program(funcs, stats) => {
         funcs.foreach(func => {
           if (functionDefs contains func.ident)
-            errors += "Redefined function: " + func.ident.name
+            errors += RedefinedFunction.genError(func.ident)
 
           functionDefs += (func.ident -> (func.ty, func.paramList.map(_.ty)))
         })
@@ -25,7 +29,7 @@ object SemanticAnalyser {
 
           func.paramList.foreach(param => {
             if (paramTable contains param.ident)
-              errors += "Redefined parameter: " + param.ident.name
+              errors += RedefinedVariableError.genError(param.ident)
             paramTable += (param.ident -> param.ty)
           })
 
@@ -48,9 +52,10 @@ object SemanticAnalyser {
       stats: List[Stat],
       returnType: Option[Type]
   )(implicit
+      source: File,
       funcTable: Map[Ident, (Type, List[Type])]
-  ): List[String] = {
-    val errors: mutable.ListBuffer[String] = mutable.ListBuffer.empty
+  ): List[WACCError] = {
+    val errors: mutable.ListBuffer[WACCError] = mutable.ListBuffer.empty
 
     val scopedSymbolTable: mutable.Map[Ident, Type] = mutable.Map.empty
     implicit var curSymbolTable: Map[Ident, Type] =
@@ -60,34 +65,49 @@ object SemanticAnalyser {
       stat match {
         case Skip() => ()
 
-        case d @ Declare(ty, ident, rvalue) => {
-          if (scopedSymbolTable contains ident)
-            errors += "Redefined variable: " + ident.name
-          else {
+        case Declare(ty, ident, rvalue) => {
+          if (scopedSymbolTable contains ident) {
+            errors += RedefinedVariableError.genError(ident)
+          } else {
             scopedSymbolTable += (ident -> ty)
             curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
           }
 
-          val (rValueType, rValueErrors) = evalTypeOfRValue(rvalue)
+          val (rValueType, rValueErrors) = evalTypeOfRValue(rvalue, stat)
           errors ++= rValueErrors
           if (!(rValueType equiv ty))
-            errors += f"Type mismatch: expected $ty, got $rValueType"
+            errors += TypeError.genError(
+              rValueType,
+              Set(ty),
+              rvalue.pos,
+              s"declaration of variable ${ident.name}"
+            )
         }
 
         case Assign(lValue, rValue) => {
           val (lValueType, lValueErrors) = evalTypeOfLValue(lValue)
-          val (rValueType, rValueErrors) = evalTypeOfRValue(rValue)
+          val (rValueType, rValueErrors) = evalTypeOfRValue(rValue, stat)
           errors ++= lValueErrors
           errors ++= rValueErrors
 
           (lValueType, rValueType) match {
             case (UnknownType(), UnknownType()) =>
-              errors += f"Type mismatch: unknown types in assignment"
-            case _ =>
+              errors += TypeError.genError(
+                rValueType,
+                Set(lValueType),
+                rValue.pos,
+                "pair element assignment"
+              )
+            case _ => {
+              if (!(lValueType equiv rValueType))
+                errors += TypeError.genError(
+                  rValueType,
+                  Set(lValueType),
+                  rValue.pos,
+                  "assignment"
+                )
+            }
           }
-
-          if (!(lValueType equiv rValueType))
-            errors += f"Type mismatch: expected $lValueType, got $rValueType"
         }
 
         case Read(lValue) => {
@@ -97,7 +117,12 @@ object SemanticAnalyser {
           lValueType match {
             case IntType() | CharType() => ()
             case _ =>
-              errors += f"Type mismatch: expected Int or Char, got $lValueType"
+              errors += TypeError.genError(
+                lValueType,
+                Set(IntType()(NULLPOS), CharType()(NULLPOS)),
+                lValue.pos,
+                "read"
+              )
           }
         }
 
@@ -108,7 +133,15 @@ object SemanticAnalyser {
           exprType match {
             case PairType(_, _) | ArrayType(_) =>
             case _ =>
-              errors += f"Type mismatch: expected Array or Pair, got $exprType"
+              errors += TypeError.genError(
+                exprType,
+                Set(
+                  ArrayType(AnyType()(NULLPOS))(NULLPOS),
+                  PairType(AnyType()(NULLPOS), AnyType()(NULLPOS))(NULLPOS)
+                ),
+                expr.pos,
+                "free"
+              )
           }
         }
 
@@ -119,8 +152,13 @@ object SemanticAnalyser {
           (returnType, exprType) match {
             case (Some(returnType), exprType) =>
               if (!(returnType equiv exprType))
-                errors += f"Type mismatch: expected $returnType, got $exprType"
-            case (None, _) => errors += "Return statement outside function"
+                errors += TypeError.genError(
+                  exprType,
+                  Set(returnType),
+                  expr.pos,
+                  "return"
+                )
+            case (None, _) => errors += UnexpectedReturnError.genError(stat)
           }
         }
 
@@ -129,7 +167,13 @@ object SemanticAnalyser {
           errors ++= exprTypeErrors
           exprType match {
             case IntType() =>
-            case _ => errors += f"Type mismatch: expected Int, got $exprType"
+            case _ =>
+              errors += TypeError.genError(
+                exprType,
+                Set(IntType()(NULLPOS)),
+                expr.pos,
+                "exit"
+              )
           }
         }
 
@@ -149,7 +193,13 @@ object SemanticAnalyser {
 
           condType match {
             case BoolType() => ()
-            case _ => errors += f"Type mismatch: expected Bool, got $condType"
+            case _ =>
+              errors += TypeError.genError(
+                condType,
+                Set(BoolType()(NULLPOS)),
+                cond.pos,
+                "if block"
+              )
           }
 
           curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
@@ -173,7 +223,13 @@ object SemanticAnalyser {
           errors ++= condTypeErrors
           condType match {
             case BoolType() => ()
-            case _ => errors += f"Type mismatch: expected Bool, got $condType"
+            case _ =>
+              errors += TypeError.genError(
+                condType,
+                Set(BoolType()(NULLPOS)),
+                cond.pos,
+                "while block"
+              )
           }
 
           curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
@@ -194,8 +250,6 @@ object SemanticAnalyser {
             returnType
           )
         }
-
-        case _ => errors += "TODO: Implement checkStatSemantics"
       }
     })
 
@@ -203,10 +257,11 @@ object SemanticAnalyser {
   }
 
   def evalTypeOfLValue(lValue: LValue)(implicit
+      source: File,
       funcTable: Map[Ident, (Type, List[Type])],
       symbolTable: Map[Ident, Type]
-  ): (Type, List[String]) = {
-    val errors: mutable.ListBuffer[String] = mutable.ListBuffer.empty
+  ): (Type, List[WACCError]) = {
+    val errors: mutable.ListBuffer[WACCError] = mutable.ListBuffer.empty
 
     lValue match {
       case ident: Ident => {
@@ -214,8 +269,8 @@ object SemanticAnalyser {
           case Some(ty) => (ty, errors.toList)
           case None =>
             (
-              ErrorType()(NULLPOS),
-              (errors += f"Variable $ident not defined").toList
+              ErrorType()(ident.pos),
+              (errors += UndefinedVariableError.genError(ident)).toList
             )
         }
       }
@@ -224,13 +279,18 @@ object SemanticAnalyser {
           case Some(ArrayType(ty)) => (ty, errors.toList)
           case Some(ty) =>
             (
-              ErrorType()(NULLPOS),
-              (errors += f"Variable $ident is not an array").toList
+              ErrorType()(ident.pos),
+              (errors += TypeError.genError(
+                ty,
+                Set(ArrayType(AnyType()(NULLPOS))(NULLPOS)),
+                ident.pos,
+                "array index"
+              )).toList
             )
           case None =>
             (
-              ErrorType()(NULLPOS),
-              (errors += f"Variable $ident not defined").toList
+              ErrorType()(ident.pos),
+              (errors += UndefinedVariableError.genError(ident)).toList
             )
         }
       }
@@ -240,8 +300,13 @@ object SemanticAnalyser {
             (fstTy.asType, lValueErrors)
           case (ty, lValueErrors) =>
             (
-              ErrorType()(NULLPOS),
-              (errors ++= lValueErrors += f"Variable $l is not a pair").toList
+              ErrorType()(l.pos),
+              (errors ++= lValueErrors += TypeError.genError(
+                ty,
+                Set(PairType(AnyType()(NULLPOS), AnyType()(NULLPOS))(NULLPOS)),
+                l.pos,
+                "fst"
+              )).toList
             )
         }
       }
@@ -251,19 +316,25 @@ object SemanticAnalyser {
             (sndTy.asType, lValueErrors)
           case (ty, lValueErrors) =>
             (
-              ErrorType()(NULLPOS),
-              (errors ++= lValueErrors += f"Variable $l is not a pair").toList
+              ErrorType()(l.pos),
+              (errors ++= lValueErrors += TypeError.genError(
+                ty,
+                Set(PairType(AnyType()(NULLPOS), AnyType()(NULLPOS))(NULLPOS)),
+                l.pos,
+                "snd"
+              )).toList
             )
         }
       }
     }
   }
 
-  def evalTypeOfRValue(rValue: RValue)(implicit
+  def evalTypeOfRValue(rValue: RValue, stat: Stat)(implicit
+      source: File,
       funcTable: Map[Ident, (Type, List[Type])],
       symbolTable: Map[Ident, Type]
-  ): (Type, List[String]) = {
-    val errors: mutable.ListBuffer[String] = mutable.ListBuffer.empty
+  ): (Type, List[WACCError]) = {
+    val errors: mutable.ListBuffer[WACCError] = mutable.ListBuffer.empty
 
     rValue match {
       case expr: Expr => evalTypeOfExpr(expr)
@@ -293,7 +364,7 @@ object SemanticAnalyser {
           errors.toList
         )
       }
-      case Call(f, args) => {
+      case c @ Call(f, args) => {
         (funcTable get f) match {
           case Some((returnType, paramTypes)) => {
             val (argTypes, argErrors) =
@@ -302,12 +373,17 @@ object SemanticAnalyser {
 
             val (returnType, paramTypes) = funcTable(f)
             if (argTypes.length != paramTypes.length)
-              errors += f"Function $f called with ${argTypes.length} arguments, expected ${paramTypes.length}"
+              errors += NoArgs.genError(f, argTypes.length, paramTypes.length)
 
-            argTypes.zip(paramTypes).foreach {
-              case (argType, paramType) => {
+            argTypes.zip(paramTypes).zipWithIndex.foreach {
+              case ((argType, paramType), i) => {
                 if (!(argType equiv paramType))
-                  errors += f"Function $f called with argument of type $argType, expected $paramType"
+                  errors += TypeError.genError(
+                    argType,
+                    Set(paramType),
+                    args.toIndexedSeq(i).pos,
+                    s"function call to ${f}"
+                  ) /* NEED TO INFORM THE USER WHICH ARGUMENT'S TYPE MISMATCHES */
               }
             }
 
@@ -315,8 +391,8 @@ object SemanticAnalyser {
           }
           case None =>
             (
-              ErrorType()(NULLPOS),
-              (errors += f"Function $f not defined").toList
+              ErrorType()(c.pos),
+              (errors += UndefinedFunction.genError(f)).toList
             )
         }
 
@@ -326,7 +402,7 @@ object SemanticAnalyser {
         errors ++= error
         exprType match {
           case PairType(fstType, _) => (fstType.asType, errors.toList)
-          case _                    => (ErrorType()(NULLPOS), errors.toList)
+          case _                    => (ErrorType()(lValue.pos), errors.toList)
         }
       }
       case Snd(lValue) => {
@@ -334,7 +410,7 @@ object SemanticAnalyser {
         errors ++= error
         exprType match {
           case PairType(_, sndType) => (sndType.asType, errors.toList)
-          case _                    => (ErrorType()(NULLPOS), errors.toList)
+          case _                    => (ErrorType()(lValue.pos), errors.toList)
         }
       }
     }
@@ -342,7 +418,10 @@ object SemanticAnalyser {
 
   def evalTypeOfExpr(
       expr: Expr
-  )(implicit symbolTable: Map[Ident, Type]): (Type, List[String]) = {
+  )(implicit
+      source: File,
+      symbolTable: Map[Ident, Type]
+  ): (Type, List[WACCError]) = {
     expr match {
       case intLit: IntegerLiter => (IntType()(intLit.pos), Nil)
       case boolLit: BoolLiter   => (BoolType()(boolLit.pos), Nil)
@@ -357,9 +436,9 @@ object SemanticAnalyser {
         )
       case ident: Ident => {
         if (symbolTable contains ident) {
-          (symbolTable(ident), Nil)
+          (symbolTable(ident).positioned(ident.pos), Nil)
         } else {
-          (ErrorType()(NULLPOS), List("Undeclared variable: " + ident.name))
+          (ErrorType()(ident.pos), List(UndefinedVariableError.genError(ident)))
         }
       }
       case ArrayElem(ident, xs) => {
@@ -370,7 +449,7 @@ object SemanticAnalyser {
           }
         }
 
-        val errors: mutable.ListBuffer[String] = mutable.ListBuffer.empty
+        val errors: mutable.ListBuffer[WACCError] = mutable.ListBuffer.empty
 
         (symbolTable get ident) match {
           case Some(t @ ArrayType(innerType)) => {
@@ -380,38 +459,52 @@ object SemanticAnalyser {
 
             if (xs.length > getArrayTypeRank(t))
               (
-                ErrorType()(NULLPOS),
-                (errors += "Array dimension mismatch").toList
+                ErrorType()(ident.pos),
+                (errors += ArrayDimensionMismatch.genError(
+                  xs.length,
+                  getArrayTypeRank(t),
+                  ident.pos
+                )).toList
               )
 
-            argTypes.foreach {
-              case argType => {
+            argTypes.zipWithIndex.foreach {
+              case (argType, i) => {
                 if (!(argType equiv IntType()(NULLPOS)))
                   (
-                    ErrorType()(NULLPOS),
-                    (errors += f"Array $ident accessed with argument of type $argType, expected Int").toList
+                    ErrorType()(ident.pos),
+                    errors += TypeError.genError(
+                      argType,
+                      Set(IntType()(NULLPOS)),
+                      xs.toIndexedSeq(i).pos,
+                      s"array access for ${ident}"
+                    )
                   )
               }
             }
 
-            (innerType, errors.toList)
+            (innerType.positioned(ident.pos), errors.toList)
           }
-          case Some(_) =>
+          case Some(ot) =>
             (
-              ErrorType()(NULLPOS),
-              (errors += "Variable is not an array").toList
+              ErrorType()(ident.pos),
+              (errors += TypeError.genError(
+                ot,
+                Set(ArrayType(AnyType()(NULLPOS))(NULLPOS)),
+                ident.pos,
+                s"array access for ${ident}"
+              )).toList
             )
           case None =>
             (
-              ErrorType()(NULLPOS),
-              (errors += f"Undeclared variable: ${ident.name}").toList
+              ErrorType()(ident.pos),
+              (errors += UndefinedVariableError.genError(ident)).toList
             )
         }
 
       }
       case not @ Not(x) =>
         checkExprType(x, BoolType()(not.pos), BoolType()(not.pos))
-      case neg @ Negate(x) =>
+      case neg @ Neg(x) =>
         checkExprType(x, IntType()(neg.pos), IntType()(neg.pos))
       case len @ Len(x) =>
         checkExprType(
@@ -478,15 +571,18 @@ object SemanticAnalyser {
       expr: Expr,
       expectedType: Type,
       retType: Type // The type of the return value
-  )(implicit symbolTable: Map[Ident, Type]): (Type, List[String]) = {
+  )(implicit
+      source: File,
+      symbolTable: Map[Ident, Type]
+  ): (Type, List[WACCError]) = {
     val (exprType, error) = evalTypeOfExpr(expr)
 
     if (exprType equiv expectedType) {
       (retType, error)
     } else {
       (
-        ErrorType()(NULLPOS),
-        error :+ f"Expected type $expectedType but got $exprType instead"
+        ErrorType()(expr.pos),
+        error :+ TypeError.genError(exprType, Set(expectedType), expr.pos, "")
       )
     }
   }
@@ -498,26 +594,27 @@ object SemanticAnalyser {
       expr2: Expr,
       retType: Type
   )(implicit
+      source: File,
       symbolTable: Map[Ident, Type]
-  ): (Type, List[String]) = {
+  ): (Type, List[WACCError]) = {
     val (expr1Type, error1) = evalTypeOfExpr(expr1)
     val (expr2Type, error2) = evalTypeOfExpr(expr2)
     val errors = error1 ++ error2
 
     if (!argTypes.exists(expr1Type equiv _)) {
       (
-        ErrorType()(NULLPOS),
-        errors :+ f"Expected type of arg1 to be one of $argTypes but got $expr1Type instead"
+        ErrorType()(expr1.pos),
+        errors :+ TypeError.genError(expr1Type, Set(expr2Type), expr1.pos, "")
       )
     } else if (!argTypes.exists(expr2Type equiv _)) {
       (
-        ErrorType()(NULLPOS),
-        errors :+ f"Expected type of arg2 to be one of $argTypes but got $expr2Type instead"
+        ErrorType()(expr2.pos),
+        errors :+ TypeError.genError(expr2Type, Set(expr1Type), expr2.pos, "")
       )
     } else if (!((expr1Type equiv expr2Type) || (expr2Type equiv expr1Type))) {
       (
-        ErrorType()(NULLPOS),
-        errors :+ f"Expected arg1 and arg2 to have the same type but got $expr1Type and $expr2Type instead"
+        ErrorType()(expr1.pos),
+        errors :+ TypeError.genError(expr1Type, Set(expr2Type), expr2.pos, "")
       )
     } else {
       (retType, errors)
@@ -528,7 +625,10 @@ object SemanticAnalyser {
   private def checkExprs(
       exprs: List[Expr],
       expectedType: Type
-  )(implicit symbolTable: Map[Ident, Type]): (Type, List[String]) = {
+  )(implicit
+      source: File,
+      symbolTable: Map[Ident, Type]
+  ): (Type, List[WACCError]) = {
     exprs match {
       case Nil => (expectedType, Nil)
       case _ => {
@@ -540,8 +640,8 @@ object SemanticAnalyser {
         } else {
           (
             (
-              ErrorType()(NULLPOS),
-              errors :+ f"Expected type $expectedType but got $types instead"
+              ErrorType()(exprs.head.pos),
+              errors
             )
           )
         }

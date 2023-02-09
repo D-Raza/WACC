@@ -72,7 +72,9 @@ object AST {
   case class Param(ty: Type, ident: Ident)(val pos: (Int, Int))
 
   // Statements
-  sealed trait Stat
+  sealed trait Stat {
+    val pos: (Int, Int)
+  }
   case class Skip()(val pos: (Int, Int)) extends Stat
   case class Assign(lValue: LValue, y: RValue)(val pos: (Int, Int)) extends Stat
   case class Declare(ty: Type, x: Ident, y: RValue)(val pos: (Int, Int))
@@ -91,8 +93,12 @@ object AST {
   case class Scope(stats: List[Stat])(val pos: (Int, Int)) extends Stat
 
   // LValues
-  sealed trait LValue
-  case class Ident(name: String)(val pos: (Int, Int)) extends LValue with Expr
+  sealed trait LValue {
+    val pos: (Int, Int)
+  }
+  case class Ident(name: String)(val pos: (Int, Int)) extends LValue with Expr {
+    override def toString(): String = s"identifier ${name}"
+  }
   case class ArrayElem(ident: Ident, xs: List[Expr])(val pos: (Int, Int))
       extends LValue
       with Expr
@@ -101,7 +107,9 @@ object AST {
   case class Snd(p: LValue)(val pos: (Int, Int)) extends PairElem
 
   // RValues
-  sealed trait RValue
+  sealed trait RValue {
+    val pos: (Int, Int)
+  }
   sealed trait Expr extends RValue
   case class ArrayLit(xs: List[Expr])(val pos: (Int, Int)) extends RValue
   case class NewPair(fst: Expr, snd: Expr)(val pos: (Int, Int)) extends RValue
@@ -127,6 +135,7 @@ object AST {
   }
 
   sealed trait Type extends WACCType {
+    def positioned(pos: (Int, Int)): Type
     def eraseInnerTypes: PairElemType
   }
   sealed trait PairElemType extends WACCType {
@@ -138,29 +147,57 @@ object AST {
     def eraseInnerTypes: PairElemType = this
   }
 
-  case class AnyType()(val pos: (Int, Int)) extends GenericType
-  case class ErrorType()(val pos: (Int, Int)) extends GenericType
-  case class UnknownType()(val pos: (Int, Int)) extends GenericType
+  case class AnyType()(val pos: (Int, Int)) extends GenericType {
+    def positioned(pos: (Int, Int)): AnyType = AnyType()(pos)
+    override def toString(): String = "any"
+  }
+  case class ErrorType()(val pos: (Int, Int)) extends GenericType {
+    def positioned(pos: (Int, Int)): ErrorType = ErrorType()(pos)
+    override def toString(): String = "ERROR"
+  }
+  case class UnknownType()(val pos: (Int, Int)) extends GenericType {
+    def positioned(pos: (Int, Int)): UnknownType = UnknownType()(pos)
+    override def toString(): String = "?"
+  }
 
   // Base Types
   sealed trait BaseType extends GenericType
-  case class IntType()(val pos: (Int, Int)) extends BaseType
-  case class BoolType()(val pos: (Int, Int)) extends BaseType
-  case class CharType()(val pos: (Int, Int)) extends BaseType
-  case class StringType()(val pos: (Int, Int)) extends BaseType
+  case class IntType()(val pos: (Int, Int)) extends BaseType {
+    def positioned(pos: (Int, Int)): IntType = IntType()(pos)
+    override def toString(): String = "int"
+  }
+  case class BoolType()(val pos: (Int, Int)) extends BaseType {
+    def positioned(pos: (Int, Int)): BoolType = BoolType()(pos)
+    override def toString(): String = "bool"
+  }
+  case class CharType()(val pos: (Int, Int)) extends BaseType {
+    def positioned(pos: (Int, Int)): CharType = CharType()(pos)
+    override def toString(): String = "char"
+  }
+  case class StringType()(val pos: (Int, Int)) extends BaseType {
+    def positioned(pos: (Int, Int)): StringType = StringType()(pos)
+    override def toString(): String = "string"
+  }
 
   // Array Types
-  case class ArrayType(ty: Type)(val pos: (Int, Int)) extends GenericType
+  case class ArrayType(ty: Type)(val pos: (Int, Int)) extends GenericType {
+    def positioned(pos: (Int, Int)): ArrayType = ArrayType(ty)(pos)
+    override def toString(): String = s"$ty[]"
+  }
 
   // Pair Types
   case class PairType(fstType: PairElemType, sndType: PairElemType)(
       val pos: (Int, Int)
   ) extends Type {
     def eraseInnerTypes: PairElemType = InnerPairType()(pos)
+    def positioned(pos: (Int, Int)): PairType = PairType(fstType, sndType)(pos)
+    override def toString(): String = s"pair($fstType, $sndType)"
   }
   case class InnerPairType()(val pos: (Int, Int)) extends PairElemType {
     def asType: Type =
       PairType(UnknownType()(NULLPOS), UnknownType()(NULLPOS))(pos)
+    def positioned(pos: (Int, Int)): InnerPairType = InnerPairType()(pos)
+    override def toString(): String = "pair"
   }
 
   // Literals
@@ -189,7 +226,7 @@ object AST {
 
   // Unary operators
   case class Not(x: Expr)(val pos: (Int, Int)) extends Expr
-  case class Negate(x: Expr)(val pos: (Int, Int)) extends Expr
+  case class Neg(x: Expr)(val pos: (Int, Int)) extends Expr
   case class Len(x: Expr)(val pos: (Int, Int)) extends Expr
   case class Ord(x: Expr)(val pos: (Int, Int)) extends Expr
   case class Chr(x: Expr)(val pos: (Int, Int)) extends Expr
@@ -263,7 +300,7 @@ object AST {
 
   // Unary operators
   object Not extends ParserBridgePos1[Expr, Expr]
-  object Negate extends ParserBridgePos1[Expr, Expr]
+  object Neg extends ParserBridgePos1[Expr, Expr]
   object Len extends ParserBridgePos1[Expr, Expr]
   object Ord extends ParserBridgePos1[Expr, Expr]
   object Chr extends ParserBridgePos1[Expr, Expr]
