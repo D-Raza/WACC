@@ -30,7 +30,6 @@ object Errors {
       errorWidth: Int
   ) {
     private val infoLineStart = " >"
-
     def genErrorInfo: String = {
       (linesBefore.map(line => s"$infoLineStart$line") ++:
         Seq(
@@ -40,8 +39,13 @@ object Errors {
         linesAfter.map(line => s"$infoLineStart$line")).mkString("\n")
     }
 
-    private def errorPointer(errorCol: Int, errorWidth: Int) =
-      s"${" " * errorCol}${"^" * errorWidth}"
+    private def errorPointer(errorCol: Int, errorWidth: Int) = {
+      val pointerSpace = " " * errorCol
+      if (errorWidth == 0)
+        pointerSpace + "^"
+      else
+        pointerSpace + "^" * errorWidth
+    }
   }
 
   case class WACCError(
