@@ -6,6 +6,7 @@ import wacc.frontend.Parser._
 import wacc.frontend.SemanticAnalyser._
 
 import java.io.File
+import sys.process._
 
 class ExitCode extends AnyFlatSpec {
 
@@ -40,6 +41,9 @@ class ExitCode extends AnyFlatSpec {
     }
     exitCode
   }
+
+  // clone repo
+  "git clone https://gitlab.doc.ic.ac.uk/lab2223_spring/wacc_examples.git/ --quiet".!
 
   "All valid programs" should "return exit code 0" in {
     val exitCode = compileFilesInDir("wacc_examples/valid")
