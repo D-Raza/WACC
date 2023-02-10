@@ -1,7 +1,7 @@
 #!/bin/bash
 
 LOGFILE="test.log"
-NO_THREADS=12
+NO_THREADS=4
 
 # Usage message
 if [[ ( $@ == "--help") ||  $@ == "-h" ]]
