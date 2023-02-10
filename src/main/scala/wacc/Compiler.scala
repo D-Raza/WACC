@@ -8,6 +8,8 @@ import java.io.File
 import scala.io.Source
 
 object Compiler {
+  val DEBUG = false
+
   def main(args: Array[String]): Unit = {
     // Argument checking
     val expectedNoArgs = 1
@@ -32,7 +34,8 @@ object Compiler {
       System.exit(-1)
     }
 
-    Source.fromFile(inputFile).getLines().foreach(println); // DEBUG
+    if (DEBUG)
+      Source.fromFile(inputFile).getLines().foreach(println);
 
     // Frontend
     println("Compiling...")
@@ -42,7 +45,9 @@ object Compiler {
 
     parseResult match {
       case Success(x) => {
-        println(x) // DEBUG
+        if (DEBUG)
+          println(x)
+
         implicit val source: File = inputFile
         val errors = checkProgramSemantics(x)
         if (errors.isEmpty) {

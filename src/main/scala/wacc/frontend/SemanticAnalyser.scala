@@ -8,6 +8,14 @@ import scala.collection.mutable
 
 object SemanticAnalyser {
 
+  /** This function is used to check the semantics of a program.
+    * @param program
+    *   The program to be checked
+    * @param source
+    *   The source file of the program
+    * @return
+    *   A list of errors found in the program
+    */
   def checkProgramSemantics(
       program: Program
   )(implicit source: File): List[WACCError] = {
@@ -15,7 +23,7 @@ object SemanticAnalyser {
     val functionDefs: mutable.Map[Ident, (Type, List[Type])] = mutable.Map.empty
 
     program match {
-      case Program(funcs, stats) => {
+      case Program(funcs, stats) =>
         funcs.foreach(func => {
           if (functionDefs contains func.ident)
             errors += RedefinedFunctionError.genError(func.ident)
@@ -42,13 +50,25 @@ object SemanticAnalyser {
         })
 
         errors ++= checkStatSemantics(Map.empty[Ident, Type], stats, None)
-      }
     }
-
     errors.toList
   }
 
-  def checkStatSemantics(
+  /** This function is used to check the semantics of a list of statements.
+    * @param symbolTable
+    *   The symbol table of the current scope
+    * @param stats
+    *   The list of statements to be checked
+    * @param returnType
+    *   The return type of the current scope, if in a function
+    * @param source
+    *   The source file of the program
+    * @param funcTable
+    *   The function table of the program
+    * @return
+    *   A list of semantic errors found in the list of statements
+    */
+  private def checkStatSemantics(
       symbolTable: Map[Ident, Type],
       stats: List[Stat],
       returnType: Option[Type]
@@ -62,206 +82,203 @@ object SemanticAnalyser {
     implicit var curSymbolTable: Map[Ident, Type] =
       symbolTable ++ scopedSymbolTable.toMap
 
-    stats.foreach(stat => {
-      stat match {
-        case Skip() => ()
+    stats.foreach {
+      case Skip() => ()
 
-        case Declare(ty, ident, rvalue) => {
-          if (scopedSymbolTable contains ident) {
-            errors += RedefinedVariableError.genError(ident)
-          } else {
-            scopedSymbolTable += (ident -> ty)
-            curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
-          }
-
-          val (rValueType, rValueErrors) = evalTypeOfRValue(rvalue, stat)
-          errors ++= rValueErrors
-          if (!(rValueType equiv ty))
-            errors += TypeMismatchError.genError(
-              rValueType,
-              Set(ty),
-              rvalue.pos,
-              s"declaration of variable ${ident.name}"
-            )
+      case Declare(ty, ident, rvalue) =>
+        if (scopedSymbolTable contains ident) {
+          errors += RedefinedVariableError.genError(ident)
+        } else {
+          scopedSymbolTable += (ident -> ty)
+          curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
         }
 
-        case Assign(lValue, rValue) => {
-          val (lValueType, lValueErrors) = evalTypeOfLValue(lValue)
-          val (rValueType, rValueErrors) = evalTypeOfRValue(rValue, stat)
-          errors ++= lValueErrors
-          errors ++= rValueErrors
+        val (rValueType, rValueErrors) = evalTypeOfRValue(rvalue)
+        errors ++= rValueErrors
+        if (!(rValueType equiv ty))
+          errors += TypeMismatchError.genError(
+            rValueType,
+            Set(ty),
+            rvalue.pos,
+            s"declaration of variable ${ident.name}"
+          )
 
-          (lValueType, rValueType) match {
-            case (UnknownType(), UnknownType()) =>
+      case Assign(lValue, rValue) =>
+        val (lValueType, lValueErrors) = evalTypeOfLValue(lValue)
+        val (rValueType, rValueErrors) = evalTypeOfRValue(rValue)
+        errors ++= lValueErrors
+        errors ++= rValueErrors
+
+        (lValueType, rValueType) match {
+          case (UnknownType(), UnknownType()) =>
+            errors += TypeMismatchError.genError(
+              rValueType,
+              Set(lValueType),
+              rValue.pos,
+              "pair element assignment"
+            )
+          case _ =>
+            if (
+              !(lValueType equiv rValueType) && (lValueType != ErrorType()(
+                NULLPOS
+              ))
+            )
               errors += TypeMismatchError.genError(
                 rValueType,
                 Set(lValueType),
                 rValue.pos,
-                "pair element assignment"
+                "assignment"
               )
-            case _ => {
-              if (
-                !(lValueType equiv rValueType) && (lValueType != ErrorType()(
-                  NULLPOS
-                ))
-              )
-                errors += TypeMismatchError.genError(
-                  rValueType,
-                  Set(lValueType),
-                  rValue.pos,
-                  "assignment"
-                )
-            }
-          }
         }
 
-        case Read(lValue) => {
-          val (lValueType, lValueErrors) = evalTypeOfLValue(lValue)
-          errors ++= lValueErrors
+      case Read(lValue) =>
+        val (lValueType, lValueErrors) = evalTypeOfLValue(lValue)
+        errors ++= lValueErrors
 
-          lValueType match {
-            case IntType() | CharType() => ()
-            case _ =>
-              errors += TypeMismatchError.genError(
-                lValueType,
-                Set(IntType()(NULLPOS), CharType()(NULLPOS)),
-                lValue.pos,
-                "read"
-              )
-          }
+        lValueType match {
+          case IntType() | CharType() => ()
+          case _ =>
+            errors += TypeMismatchError.genError(
+              lValueType,
+              Set(IntType()(NULLPOS), CharType()(NULLPOS)),
+              lValue.pos,
+              "read"
+            )
         }
 
-        case Free(expr) => {
-          val (exprType, exprTypeErrors) = evalTypeOfExpr(expr)
-          errors ++= exprTypeErrors
+      case Free(expr) =>
+        val (exprType, exprTypeErrors) = evalTypeOfExpr(expr)
+        errors ++= exprTypeErrors
 
-          exprType match {
-            case PairType(_, _) | ArrayType(_) =>
-            case _ =>
-              errors += TypeMismatchError.genError(
-                exprType,
-                Set(
-                  ArrayType(AnyType()(NULLPOS))(NULLPOS),
-                  PairType(AnyType()(NULLPOS), AnyType()(NULLPOS))(NULLPOS)
-                ),
-                expr.pos,
-                "free"
-              )
-          }
+        exprType match {
+          case PairType(_, _) | ArrayType(_) =>
+          case _ =>
+            errors += TypeMismatchError.genError(
+              exprType,
+              Set(
+                ArrayType(AnyType()(NULLPOS))(NULLPOS),
+                PairType(AnyType()(NULLPOS), AnyType()(NULLPOS))(NULLPOS)
+              ),
+              expr.pos,
+              "free"
+            )
         }
 
-        case Return(expr) => {
-          val (exprType, exprTypeErrors) = evalTypeOfExpr(expr)
-          errors ++= exprTypeErrors
+      case stat @ Return(expr) =>
+        val (exprType, exprTypeErrors) = evalTypeOfExpr(expr)
+        errors ++= exprTypeErrors
 
-          (returnType, exprType) match {
-            case (Some(returnType), exprType) =>
-              if (!(returnType equiv exprType))
-                errors += TypeMismatchError.genError(
-                  exprType,
-                  Set(returnType),
-                  expr.pos,
-                  "return"
-                )
-            case (None, _) => errors += UnexpectedReturnError.genError(stat)
-          }
-        }
-
-        case Exit(expr) => {
-          val (exprType, exprTypeErrors) = evalTypeOfExpr(expr)
-          errors ++= exprTypeErrors
-          exprType match {
-            case IntType() =>
-            case _ =>
+        (returnType, exprType) match {
+          case (Some(returnType), exprType) =>
+            if (!(returnType equiv exprType))
               errors += TypeMismatchError.genError(
                 exprType,
-                Set(IntType()(NULLPOS)),
+                Set(returnType),
                 expr.pos,
-                "exit"
+                "return"
               )
-          }
+          case (None, _) => errors += UnexpectedReturnError.genError(stat)
         }
 
-        case Print(expr) => {
-          val (exprType, exprTypeErrors) = evalTypeOfExpr(expr)
-          errors ++= exprTypeErrors
+      case Exit(expr) =>
+        val (exprType, exprTypeErrors) = evalTypeOfExpr(expr)
+        errors ++= exprTypeErrors
+        exprType match {
+          case IntType() =>
+          case _ =>
+            errors += TypeMismatchError.genError(
+              exprType,
+              Set(IntType()(NULLPOS)),
+              expr.pos,
+              "exit"
+            )
         }
 
-        case Println(expr) => {
-          val (exprType, exprTypeErrors) = evalTypeOfExpr(expr)
-          errors ++= exprTypeErrors
+      case Print(expr) =>
+        val (_, exprTypeErrors) = evalTypeOfExpr(expr)
+        errors ++= exprTypeErrors
+
+      case Println(expr) =>
+        val (_, exprTypeErrors) = evalTypeOfExpr(expr)
+        errors ++= exprTypeErrors
+
+      case If(cond, thenStat, elseStat) =>
+        val (condType, condTypeErrors) = evalTypeOfExpr(cond)
+        errors ++= condTypeErrors
+
+        condType match {
+          case BoolType() => ()
+          case _ =>
+            errors += TypeMismatchError.genError(
+              condType,
+              Set(BoolType()(NULLPOS)),
+              cond.pos,
+              "if block"
+            )
         }
 
-        case If(cond, thenStat, elseStat) => {
-          val (condType, condTypeErrors) = evalTypeOfExpr(cond)
-          errors ++= condTypeErrors
+        curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
 
-          condType match {
-            case BoolType() => ()
-            case _ =>
-              errors += TypeMismatchError.genError(
-                condType,
-                Set(BoolType()(NULLPOS)),
-                cond.pos,
-                "if block"
-              )
-          }
+        errors ++= checkStatSemantics(
+          curSymbolTable,
+          thenStat,
+          returnType
+        )
 
-          curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
+        errors ++= checkStatSemantics(
+          curSymbolTable,
+          elseStat,
+          returnType
+        )
 
-          errors ++= checkStatSemantics(
-            curSymbolTable,
-            thenStat,
-            returnType
-          )
-
-          errors ++= checkStatSemantics(
-            curSymbolTable,
-            elseStat,
-            returnType
-          )
-
+      case While(cond, doStat) =>
+        val (condType, condTypeErrors) = evalTypeOfExpr(cond)
+        errors ++= condTypeErrors
+        condType match {
+          case BoolType() => ()
+          case _ =>
+            errors += TypeMismatchError.genError(
+              condType,
+              Set(BoolType()(NULLPOS)),
+              cond.pos,
+              "while block"
+            )
         }
 
-        case While(cond, doStat) => {
-          val (condType, condTypeErrors) = evalTypeOfExpr(cond)
-          errors ++= condTypeErrors
-          condType match {
-            case BoolType() => ()
-            case _ =>
-              errors += TypeMismatchError.genError(
-                condType,
-                Set(BoolType()(NULLPOS)),
-                cond.pos,
-                "while block"
-              )
-          }
+        curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
 
-          curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
+        errors ++= checkStatSemantics(
+          curSymbolTable,
+          doStat,
+          returnType
+        )
 
-          errors ++= checkStatSemantics(
-            curSymbolTable,
-            doStat,
-            returnType
-          )
-        }
+      case Scope(scopeStats) =>
+        curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
 
-        case Scope(scopeStats) => {
-          curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
-
-          errors ++= checkStatSemantics(
-            curSymbolTable,
-            scopeStats,
-            returnType
-          )
-        }
-      }
-    })
+        errors ++= checkStatSemantics(
+          curSymbolTable,
+          scopeStats,
+          returnType
+        )
+    }
 
     errors.toList
   }
 
-  def evalTypeOfLValue(lValue: LValue)(implicit
+  /** Evaluates the type of a left-hand value
+    * @param lValue
+    *   the left-hand value to evaluate
+    * @param source
+    *   the source file
+    * @param funcTable
+    *   the function table
+    * @param symbolTable
+    *   the symbol table
+    * @return
+    *   the type of the left-hand value and a list of errors if found
+    */
+  private def evalTypeOfLValue(lValue: LValue)(implicit
       source: File,
       funcTable: Map[Ident, (Type, List[Type])],
       symbolTable: Map[Ident, Type]
@@ -269,8 +286,8 @@ object SemanticAnalyser {
     val errors: mutable.ListBuffer[WACCError] = mutable.ListBuffer.empty
 
     lValue match {
-      case ident: Ident => {
-        (symbolTable get ident) match {
+      case ident: Ident =>
+        symbolTable get ident match {
           case Some(ty) => (ty, errors.toList)
           case None =>
             (
@@ -278,9 +295,8 @@ object SemanticAnalyser {
               (errors += UndefinedVariableError.genError(ident)).toList
             )
         }
-      }
-      case ArrayElem(ident, xs) => {
-        (symbolTable get ident) match {
+      case ArrayElem(ident, _) =>
+        symbolTable get ident match {
           case Some(ArrayType(ty)) => (ty, errors.toList)
           case Some(ty) =>
             (
@@ -298,8 +314,7 @@ object SemanticAnalyser {
               (errors += UndefinedVariableError.genError(ident)).toList
             )
         }
-      }
-      case Fst(l) => {
+      case Fst(l) =>
         evalTypeOfLValue(l) match {
           case (PairType(fstTy, _), lValueErrors) =>
             (fstTy.asType, lValueErrors)
@@ -314,8 +329,7 @@ object SemanticAnalyser {
               )).toList
             )
         }
-      }
-      case Snd(l) => {
+      case Snd(l) =>
         evalTypeOfLValue(l) match {
           case (PairType(_, sndTy), lValueErrors) =>
             (sndTy.asType, lValueErrors)
@@ -330,11 +344,22 @@ object SemanticAnalyser {
               )).toList
             )
         }
-      }
     }
   }
 
-  def evalTypeOfRValue(rValue: RValue, stat: Stat)(implicit
+  /** Evaluates the type of a right-hand value
+    * @param rValue
+    *   the right-hand value to evaluate
+    * @param source
+    *   the source file
+    * @param funcTable
+    *   the function table
+    * @param symbolTable
+    *   the symbol table
+    * @return
+    *   the type of the right-hand value and a list of errors if found
+    */
+  private def evalTypeOfRValue(rValue: RValue)(implicit
       source: File,
       funcTable: Map[Ident, (Type, List[Type])],
       symbolTable: Map[Ident, Type]
@@ -343,11 +368,11 @@ object SemanticAnalyser {
 
     rValue match {
       case expr: Expr => evalTypeOfExpr(expr)
-      case arrayLit @ ArrayLit(xs) => {
+      case arrayLit @ ArrayLit(xs) =>
         xs match {
           case Nil =>
             (ArrayType(AnyType()(NULLPOS))(arrayLit.pos), errors.toList)
-          case xs @ (head :: tail) => {
+          case head :: tail =>
             val (expectedArrElemType, headErrors) =
               evalTypeOfExpr(head)
             errors ++= headErrors
@@ -356,10 +381,8 @@ object SemanticAnalyser {
               checkExprs(tail, expectedArrElemType)
             errors ++= tailErrors
             (ArrayType(actualArrElemType)(arrayLit.pos), errors.toList)
-          }
         }
-      }
-      case NewPair(fst, snd) => {
+      case NewPair(fst, snd) =>
         val (fstType, fstErrors) = evalTypeOfExpr(fst)
         val (sndType, sndErrors) = evalTypeOfExpr(snd)
         errors ++= fstErrors
@@ -368,10 +391,9 @@ object SemanticAnalyser {
           PairType(fstType.eraseInnerTypes, sndType.eraseInnerTypes)(NULLPOS),
           errors.toList
         )
-      }
-      case c @ Call(f, args) => {
-        (funcTable get f) match {
-          case Some((returnType, paramTypes)) => {
+      case c @ Call(f, args) =>
+        funcTable get f match {
+          case Some((_, _)) =>
             val (argTypes, argErrors) =
               args.map(evalTypeOfExpr(_)).unzip
             errors ++= argErrors.flatten
@@ -385,47 +407,52 @@ object SemanticAnalyser {
               )
 
             argTypes.zip(paramTypes).zipWithIndex.foreach {
-              case ((argType, paramType), i) => {
+              case ((argType, paramType), i) =>
                 if (!(argType equiv paramType))
                   errors += TypeMismatchError.genError(
                     argType,
                     Set(paramType),
                     args.toIndexedSeq(i).pos,
-                    s"function call to $f, argument $i: expecting $paramType, got $argType"
+                    s"function call to $f, argument $i"
                   )
-              }
             }
 
             (returnType, errors.toList)
-          }
           case None =>
             (
               ErrorType()(c.pos),
               (errors += UndefinedFunctionError.genError(f)).toList
             )
         }
-
-      }
-      case Fst(lValue) => {
+      case Fst(lValue) =>
         val (exprType, error) = evalTypeOfLValue(lValue)
         errors ++= error
         exprType match {
           case PairType(fstType, _) => (fstType.asType, errors.toList)
           case _                    => (ErrorType()(lValue.pos), errors.toList)
         }
-      }
-      case Snd(lValue) => {
+      case Snd(lValue) =>
         val (exprType, error) = evalTypeOfLValue(lValue)
         errors ++= error
         exprType match {
           case PairType(_, sndType) => (sndType.asType, errors.toList)
           case _                    => (ErrorType()(lValue.pos), errors.toList)
         }
-      }
     }
   }
 
-  def evalTypeOfExpr(
+  /** Evaluates the type of an expression
+    * @param expr
+    *   the expression to evaluate
+    * @param source
+    *   the source file
+    * @param symbolTable
+    *   the symbol table
+    * @return
+    *   the type of the expression and a list of any errors found during
+    *   evaluation
+    */
+  private def evalTypeOfExpr(
       expr: Expr
   )(implicit
       source: File,
@@ -443,14 +470,13 @@ object SemanticAnalyser {
           ),
           Nil
         )
-      case ident: Ident => {
+      case ident: Ident =>
         if (symbolTable contains ident) {
           (symbolTable(ident).positioned(ident.pos), Nil)
         } else {
           (ErrorType()(ident.pos), List(UndefinedVariableError.genError(ident)))
         }
-      }
-      case ArrayElem(ident, xs) => {
+      case ArrayElem(ident, xs) =>
         def getArrayTypeRank(ty: Type): Int = {
           ty match {
             case ArrayType(innerTy) => 1 + getArrayTypeRank(innerTy)
@@ -460,8 +486,8 @@ object SemanticAnalyser {
 
         val errors: mutable.ListBuffer[WACCError] = mutable.ListBuffer.empty
 
-        (symbolTable get ident) match {
-          case Some(t @ ArrayType(innerType)) => {
+        symbolTable get ident match {
+          case Some(t @ ArrayType(innerType)) =>
             val (argTypes, argErrors) =
               xs.map(evalTypeOfExpr(_)).unzip
             errors ++= argErrors.flatten
@@ -476,23 +502,20 @@ object SemanticAnalyser {
                 )).toList
               )
 
-            argTypes.zipWithIndex.foreach {
-              case (argType, i) => {
-                if (!(argType equiv IntType()(NULLPOS)))
-                  (
-                    ErrorType()(ident.pos),
-                    errors += TypeMismatchError.genError(
-                      argType,
-                      Set(IntType()(NULLPOS)),
-                      xs.toIndexedSeq(i).pos,
-                      s"array access for ${ident}"
-                    )
+            argTypes.zipWithIndex.foreach { case (argType, i) =>
+              if (!(argType equiv IntType()(NULLPOS)))
+                (
+                  ErrorType()(ident.pos),
+                  errors += TypeMismatchError.genError(
+                    argType,
+                    Set(IntType()(NULLPOS)),
+                    xs.toIndexedSeq(i).pos,
+                    s"array access for $ident"
                   )
-              }
+                )
             }
 
             (innerType.positioned(ident.pos), errors.toList)
-          }
           case Some(ot) =>
             (
               ErrorType()(ident.pos),
@@ -500,7 +523,7 @@ object SemanticAnalyser {
                 ot,
                 Set(ArrayType(AnyType()(NULLPOS))(NULLPOS)),
                 ident.pos,
-                s"array access for ${ident}"
+                s"array access for $ident"
               )).toList
             )
           case None =>
@@ -509,8 +532,6 @@ object SemanticAnalyser {
               (errors += UndefinedVariableError.genError(ident)).toList
             )
         }
-
-      }
       case not @ Not(x) =>
         checkExprType(x, BoolType()(not.pos), BoolType()(not.pos))
       case neg @ Neg(x) =>
@@ -575,7 +596,21 @@ object SemanticAnalyser {
     }
   }
 
-  // Check that an expression is of a certain type
+  /** Check that an expression is of a certain type
+    * @param expr
+    *   The expression to check
+    * @param expectedType
+    *   The expected type
+    * @param retType
+    *   The type to return if the expression is of the expected type
+    * @param source
+    *   The source file
+    * @param symbolTable
+    *   The symbol table
+    * @return
+    *   The expected type if the expr is of it, or ErrorType otherwise, and a
+    *   list of errors
+    */
   private def checkExprType(
       expr: Expr,
       expectedType: Type,
@@ -601,7 +636,23 @@ object SemanticAnalyser {
     }
   }
 
-  // Check that two expressions are of the same expected type
+  /** Check that two expressions are of the same expected type
+    * @param argTypes
+    *   The set of expected types
+    * @param expr1
+    *   The first expression
+    * @param expr2
+    *   The second expression
+    * @param retType
+    *   The type of the return value
+    * @param source
+    *   The source file
+    * @param symbolTable
+    *   The symbol table
+    * @return
+    *   The expected type if the expr is of it, or ErrorType otherwise, and a
+    *   list of errors
+    */
   private def check2ExprType(
       argTypes: Set[Type],
       expr1: Expr,
@@ -623,7 +674,7 @@ object SemanticAnalyser {
           argTypes,
           expr1.pos,
           ""
-        ) // Set(expr2Type)
+        )
       )
     } else if (!argTypes.exists(expr2Type equiv _)) {
       (
@@ -650,7 +701,19 @@ object SemanticAnalyser {
     }
   }
 
-  // Check that a list of expressions are of a certain type
+  /** Check that a list of expressions are of a certain type
+    * @param exprs
+    *   List of expressions
+    * @param expectedType
+    *   The expected type of the expressions
+    * @param source
+    *   The source file
+    * @param symbolTable
+    *   The symbol table
+    * @return
+    *   The expected type if the exprs are of it, or ErrorType otherwise, and a
+    *   list of errors
+    */
   private def checkExprs(
       exprs: List[Expr],
       expectedType: Type
@@ -677,5 +740,4 @@ object SemanticAnalyser {
       }
     }
   }
-
 }

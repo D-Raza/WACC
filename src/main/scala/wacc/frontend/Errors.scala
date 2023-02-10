@@ -128,20 +128,30 @@ object Errors {
 
   case class TypeMismatchError(
       gotType: Type,
-      expectedType: Set[Type],
+      expectedTypes: Set[Type],
       additionalPosInfo: String,
       lineInfo: WACCLineInfo
   ) extends SemanticError {
-    override val errorLines: Seq[String] = Seq(
-      s"Type mismatch error${additionalPosInfo match {
-          case "" => ""
-          case _  => " at " + additionalPosInfo
-        }}:${if (containsErrorType(gotType)) ""
-        else " got " + gotType.toString + ","} expected ${expectedType.size match {
-          case 1 => expectedType.head
-          case _ => "one of " + expectedType.mkString(", ")
-        }}"
-    )
+    override val errorLines: Seq[String] =
+      if (
+        expectedTypes.exists(
+          ErrorType()(NULLPOS) equiv _
+        ) && (gotType equiv UnknownType()(NULLPOS))
+      )
+        Seq(
+          "Types of both sides of the assignment must be known - pairs are unknown here due to type erasure"
+        )
+      else
+        Seq(
+          s"Type mismatch error${additionalPosInfo match {
+              case "" => ""
+              case _  => " at " + additionalPosInfo
+            }}:${if (containsErrorType(gotType)) ""
+            else " got " + gotType.toString + ","} expected ${expectedTypes.size match {
+              case 1 => expectedTypes.head
+              case _ => "one of " + expectedTypes.mkString(", ")
+            }}"
+        )
 
     private def containsErrorType(ty: Type): Boolean = ty match {
       case ErrorType()   => true

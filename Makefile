@@ -11,7 +11,7 @@ format:
 test: build
 	bash test.sh $(milestone)
 
-check: build
+check:
 	sbt test
 
 build:

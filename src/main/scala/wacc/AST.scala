@@ -6,17 +6,31 @@ import parsley.position._
 object genericbridgesPos {
   import parsley.implicits.zipped.{Zipped2, Zipped3, Zipped4}
 
+  /** A bridge between a singleton and a parser
+    * @tparam A
+    *   The type of the singleton
+    */
   trait ParserSingletonBridgePos[+A] {
     def con(pos: (Int, Int)): A
     def <#(op: Parsley[_]): Parsley[A] = pos.map(this.con(_)) <* op
   }
 
+  /** A parser bridge pattern, with no arguments
+    * @tparam R
+    *   The type of the result
+    */
   trait ParserBridgePos0[R] extends ParserSingletonBridgePos[R] {
     override final def con(pos: (Int, Int)): R = this.apply()(pos)
 
     def apply()(pos: (Int, Int)): R
   }
 
+  /** A parser bridge pattern, with one argument
+    * @tparam A
+    *   The type of the argument
+    * @tparam B
+    *   The type of the result
+    */
   trait ParserBridgePos1[-A, +B] extends ParserSingletonBridgePos[A => B] {
     override final def con(pos: (Int, Int)): A => B = this.apply(_)(pos)
 
@@ -25,6 +39,14 @@ object genericbridgesPos {
     def apply(x: Parsley[A]): Parsley[B] = pos <**> x.map(this.apply(_) _)
   }
 
+  /** A parser bridge pattern, with two arguments
+    * @tparam A
+    *   The type of the first argument
+    * @tparam B
+    *   The type of the second argument
+    * @tparam C
+    *   The type of the result
+    */
   trait ParserBridgePos2[-A, -B, +C]
       extends ParserSingletonBridgePos[(A, B) => C] {
     override final def con(pos: (Int, Int)): (A, B) => C = this.apply(_, _)(pos)
@@ -35,6 +57,16 @@ object genericbridgesPos {
       pos <**> (x, y).zipped(this.apply(_, _) _)
   }
 
+  /** A parser bridge pattern, with three arguments
+    * @tparam A
+    *   The type of the first argument
+    * @tparam B
+    *   The type of the second argument
+    * @tparam C
+    *   The type of the third argument
+    * @tparam D
+    *   The type of the result
+    */
   trait ParserBridgePos3[-A, -B, -C, +D]
       extends ParserSingletonBridgePos[(A, B, C) => D] {
     override final def con(pos: (Int, Int)): (A, B, C) => D =
@@ -46,6 +78,18 @@ object genericbridgesPos {
       pos <**> (x, y, z).zipped(this.apply(_, _, _) _)
   }
 
+  /** A parser bridge pattern, with four arguments
+    * @tparam A
+    *   The type of the first argument
+    * @tparam B
+    *   The type of the second argument
+    * @tparam C
+    *   The type of the third argument
+    * @tparam D
+    *   The type of the fourth argument
+    * @tparam E
+    *   The type of the result
+    */
   trait ParserBridgePos4[-A, -B, -C, -D, +E]
       extends ParserSingletonBridgePos[(A, B, C, D) => E] {
     override final def con(pos: (Int, Int)): (A, B, C, D) => E =
@@ -66,6 +110,7 @@ object genericbridgesPos {
 object AST {
   import genericbridgesPos._
 
+  // Null position
   val NULLPOS: (Int, Int) = (-1, -1)
 
   // Statements
@@ -232,7 +277,12 @@ object AST {
   ) extends Type {
     def eraseInnerTypes: PairElemType = InnerPairType()(pos)
     def positioned(pos: (Int, Int)): PairType = PairType(fstType, sndType)(pos)
-    override def toString(): String = s"pair($fstType, $sndType)"
+    override def toString(): String = if (
+      (fstType equiv UnknownType()(NULLPOS)) && (sndType equiv UnknownType()(
+        NULLPOS
+      ))
+    ) "pair"
+    else s"pair($fstType, $sndType)"
   }
 
   case class InnerPairType()(val pos: (Int, Int)) extends PairElemType {

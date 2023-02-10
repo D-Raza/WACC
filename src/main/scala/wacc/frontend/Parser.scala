@@ -15,6 +15,7 @@ import java.io.File
 
 object Parser {
 
+  // Utilise our custom error builder
   implicit val waccErrorBuilder: WACCErrorBuilder =
     new WACCErrorBuilder
   private lazy val `<program>` = fully(
@@ -196,6 +197,12 @@ object Parser {
     }
   }
 
+  /** Parses a WACC program from a file
+    * @param input
+    *   the file to parse
+    * @return
+    *   the parsed program
+    */
   def parse(input: File): Result[WACCError, Program] =
     `<program>`.parseFromFile(input).get
 
