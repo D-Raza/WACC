@@ -262,7 +262,9 @@ object Errors {
   }
 
   object WACCLineInfo {
-    def genLineInfo(pos: (Int, Int), idLength: Int)(implicit source: File): WACCLineInfo = {
+    def genLineInfo(pos: (Int, Int), idLength: Int)(implicit
+        source: File
+    ): WACCLineInfo = {
       val (line, col) = pos
       val sourceLines = Source.fromFile(source).getLines().toArray
       val lineBefore = line match {
@@ -290,7 +292,10 @@ object Errors {
       WACCError(
         id.pos,
         source,
-        new UndefinedVariableError(id, WACCLineInfo.genLineInfo(id.pos, id.toString().length()))
+        new UndefinedVariableError(
+          id,
+          WACCLineInfo.genLineInfo(id.pos, id.toString().length())
+        )
       )
     }
   }
@@ -300,7 +305,10 @@ object Errors {
       WACCError(
         id.pos,
         source,
-        new RedefinedVariableError(id, WACCLineInfo.genLineInfo(id.pos, id.toString().length()))
+        new RedefinedVariableError(
+          id,
+          WACCLineInfo.genLineInfo(id.pos, id.toString().length())
+        )
       )
     }
   }
@@ -310,7 +318,10 @@ object Errors {
       WACCError(
         id.pos,
         source,
-        new UndefinedFunctionError(id, WACCLineInfo.genLineInfo(id.pos, id.toString().length()))
+        new UndefinedFunctionError(
+          id,
+          WACCLineInfo.genLineInfo(id.pos, id.toString().length())
+        )
       )
     }
   }
@@ -320,7 +331,10 @@ object Errors {
       WACCError(
         id.pos,
         source,
-        new RedefinedFunctionError(id, WACCLineInfo.genLineInfo(id.pos, id.toString().length()))
+        new RedefinedFunctionError(
+          id,
+          WACCLineInfo.genLineInfo(id.pos, id.toString().length())
+        )
       )
     }
   }
@@ -350,7 +364,10 @@ object Errors {
       WACCError(
         stat.pos,
         source,
-        new UnexpectedReturnError(stat, WACCLineInfo.genLineInfo(stat.pos, stat.toString().length())) // return.length
+        new UnexpectedReturnError(
+          stat,
+          WACCLineInfo.genLineInfo(stat.pos, stat.toString().length())
+        ) // return.length
       )
     }
   }
