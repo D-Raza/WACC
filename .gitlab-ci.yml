@@ -28,3 +28,6 @@ test-job:
   # extends: .install_dependencies
   script:
     - make test
+  artifacts:
+    paths:
+      - test.log

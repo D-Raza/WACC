@@ -15,7 +15,7 @@ if [ ! -d wacc_examples ]; then
   git clone https://gitlab.doc.ic.ac.uk/lab2223_spring/wacc_examples.git/ --quiet
 else
   cd wacc_examples
-  # git reset --hard HEAD --quiet
+  git reset --hard HEAD --quiet
   git pull --quiet
   cd ..
 fi
