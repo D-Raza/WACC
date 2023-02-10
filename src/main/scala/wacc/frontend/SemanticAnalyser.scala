@@ -99,7 +99,11 @@ object SemanticAnalyser {
                 "pair element assignment"
               )
             case _ => {
-              if (!(lValueType equiv rValueType))
+              if (
+                !(lValueType equiv rValueType) && (lValueType != ErrorType()(
+                  NULLPOS
+                ))
+              )
                 errors += TypeError.genError(
                   rValueType,
                   Set(lValueType),
