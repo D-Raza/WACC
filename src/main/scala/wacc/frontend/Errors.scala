@@ -1,57 +1,47 @@
 package wacc.frontend
 
-import wacc.frontend.Lexer._
-import wacc.AST._
-import java.io.File
-import scala.io.Source
 import parsley.Parsley
 import parsley.Parsley._
 import parsley.errors.ErrorBuilder
 import parsley.errors.tokenextractors.LexToken
+import wacc.AST._
+import wacc.frontend.Lexer._
 
-object errors {
+import java.io.File
+import scala.io.Source
+
+object Errors {
+
+  private val numLinesBeforeError = 1
+  private val numLinesAfterError = 1
+
+  sealed trait WACCErrorInfoLines {
+    val errorLines: Seq[String]
+    val lineInfo: WACCLineInfo
+  }
+
+  sealed trait SemanticError extends WACCErrorInfoLines
 
   case class WACCLineInfo(
       line: String,
       linesBefore: Seq[String],
       linesAfter: Seq[String],
-      errorPointsAt: Int,
+      errorCol: Int,
       errorWidth: Int
   ) {
-    private val errorLineStart = " >"
-    private def errorPointer(caretAt: Int, errorWidth: Int) =
-      s"${" " * caretAt}${"^" * errorWidth}"
+    private val infoLineStart = " >"
 
     def genErrorInfo: String = {
-      (linesBefore.map(line => s"$errorLineStart$line") ++:
+      (linesBefore.map(line => s"$infoLineStart$line") ++:
         Seq(
-          s"$errorLineStart$line",
-          s"$errorLineStart${errorPointer(errorPointsAt, errorWidth)}"
+          s"$infoLineStart$line",
+          s"$infoLineStart${errorPointer(errorCol, errorWidth)}"
         ) ++:
-        linesAfter.map(line => s"$errorLineStart$line")).mkString("\n")
+        linesAfter.map(line => s"$infoLineStart$line")).mkString("\n")
     }
-  }
 
-  object WACCLineInfo {
-    def genLineInfo(pos: (Int, Int))(implicit source: File): WACCLineInfo = {
-      val (line, col) = pos
-      val sourceLines = Source.fromFile(source).getLines().toArray
-      val lineBefore = if (line > 1) sourceLines(line - 2) else ""
-      val lineAfter = if (line < sourceLines.length) sourceLines(line) else ""
-      val errorWidth = 1
-      WACCLineInfo(
-        sourceLines(line - 1),
-        Seq(lineBefore),
-        Seq(lineAfter),
-        col,
-        errorWidth
-      )
-    }
-  }
-
-  sealed trait WACCErrorInfoLines {
-    val errorLines: Seq[String]
-    val lineInfo: WACCLineInfo
+    private def errorPointer(errorCol: Int, errorWidth: Int) =
+      s"${" " * errorCol}${"^" * errorWidth}"
   }
 
   case class WACCError(
@@ -66,7 +56,7 @@ object errors {
       }
       val (line, col) = pos
 
-      s"""${errorType} in ${source.getName()} at line ${line}, col ${col}:
+      s"""$errorType in ${source.getName} at line $line, col $col:
           |${lines.errorLines.mkString("\n")}
           |${lines.lineInfo.genErrorInfo}
           |
@@ -97,32 +87,34 @@ object errors {
     }
   }
 
-  sealed trait SemanticError extends WACCErrorInfoLines
-
   case class UndefinedVariableError(ident: Ident, lineInfo: WACCLineInfo)
       extends SemanticError {
     override val errorLines: Seq[String] = Seq(
       s"Variable ${ident.name} undefined"
     )
   }
+
   case class RedefinedVariableError(ident: Ident, lineInfo: WACCLineInfo)
       extends SemanticError {
     override val errorLines: Seq[String] = Seq(
       s"Variable ${ident.name} already defined"
     )
   }
+
   case class UndefinedFunctionError(ident: Ident, lineInfo: WACCLineInfo)
       extends SemanticError {
     override val errorLines: Seq[String] = Seq(
       s"Function ${ident.name} undefined"
     )
   }
+
   case class RedefinedFunctionError(ident: Ident, lineInfo: WACCLineInfo)
       extends SemanticError {
     override val errorLines: Seq[String] = Seq(
       s"Function ${ident.name} already defined"
     )
   }
+
   case class IncorrectNumberOfArgsError(
       ident: Ident,
       gotNoArgs: Int,
@@ -130,7 +122,7 @@ object errors {
       lineInfo: WACCLineInfo
   ) extends SemanticError {
     override val errorLines: Seq[String] = Seq(
-      s"Incorrect number of arguments for function ${ident.name}. Expected ${expectedNoArgs} arguments, got ${gotNoArgs} arguments"
+      s"Incorrect number of arguments for function ${ident.name}. Expected $expectedNoArgs arguments, got $gotNoArgs arguments"
     )
   }
 
@@ -140,14 +132,6 @@ object errors {
       additionalPosInfo: String,
       lineInfo: WACCLineInfo
   ) extends SemanticError {
-    def containsErrorType(ty: Type): Boolean = ty match {
-      case ErrorType()   => true
-      case ArrayType(ty) => containsErrorType(ty)
-      case PairType(fstType, sndType) =>
-        containsErrorType(fstType.asType) || containsErrorType(sndType.asType)
-      case _ => false
-    }
-
     override val errorLines: Seq[String] = Seq(
       s"Type mismatch error${additionalPosInfo match {
           case "" => ""
@@ -158,6 +142,14 @@ object errors {
           case _ => "one of " + expectedType.mkString(", ")
         }}"
     )
+
+    private def containsErrorType(ty: Type): Boolean = ty match {
+      case ErrorType()   => true
+      case ArrayType(ty) => containsErrorType(ty)
+      case PairType(fstType, sndType) =>
+        containsErrorType(fstType.asType) || containsErrorType(sndType.asType)
+      case _ => false
+    }
   }
 
   case class UnexpectedReturnError(stat: Stat, lineInfo: WACCLineInfo)
@@ -173,8 +165,108 @@ object errors {
       lineInfo: WACCLineInfo
   ) extends SemanticError {
     override val errorLines: Seq[String] = Seq(
-      s"Array dimension mismatch: got ${gotDims}, expected ${expectedDims}"
+      s"Array dimension mismatch: got $gotDims, expected $expectedDims"
     )
+  }
+
+  class WACCErrorBuilder extends ErrorBuilder[WACCError] with LexToken {
+
+    type ErrorInfoLines = WACCErrorInfoLines
+    type Source = File
+    type Position = (Int, Int)
+    type LineInfo = WACCLineInfo
+    type Message = String
+    type Messages = Seq[Message]
+    type ExpectedItems = Option[String]
+    type ExpectedLine = Option[String]
+    type UnexpectedLine = Option[String]
+    type Item = String
+    type EndOfInput = String
+    type Named = String
+    type Raw = String
+    override val numLinesBefore: Int = numLinesBeforeError
+    override val numLinesAfter: Int = numLinesAfterError
+    override val endOfInput: EndOfInput = "end of file"
+    private val tokenParsers = Lexer.keywords.map { keyword =>
+      lookAhead(attempt(parsley.character.string(keyword)))
+    }
+
+    override def tokens: Seq[Parsley[String]] = Seq(
+      lexer.nonlexeme.names.identifier
+    ) ++ tokenParsers.toSeq
+
+    override def format(
+        pos: Position,
+        source: Source,
+        lines: ErrorInfoLines
+    ): WACCError = WACCError(pos, source, lines)
+
+    override def pos(line: Int, col: Int): Position = (line, col)
+
+    override def source(source: Option[String]): Source = new File(source.get)
+
+    override def vanillaError(
+        unexpected: UnexpectedLine,
+        expected: ExpectedLine,
+        reasons: Messages,
+        line: LineInfo
+    ): ErrorInfoLines = SyntaxError(unexpected, expected, reasons, line)
+
+    override def specialisedError(
+        msgs: Messages,
+        line: LineInfo
+    ): ErrorInfoLines = SyntaxError(None, None, msgs, line)
+
+    override def combineExpectedItems(alts: Set[Item]): ExpectedItems = Some(
+      alts.mkString(", ").replaceAll(", ([^,]+)$", " or $1")
+    )
+
+    override def combineMessages(alts: Seq[Message]): Messages = alts.toList
+
+    override def unexpected(item: Option[Item]): UnexpectedLine = item
+
+    override def expected(alts: ExpectedItems): ExpectedLine = alts
+
+    override def reason(reason: String): Message = reason
+
+    override def message(msg: String): Message = msg
+
+    override def lineInfo(
+        line: String,
+        linesBefore: Seq[String],
+        linesAfter: Seq[String],
+        errorPointsAt: Int,
+        errorWidth: Int
+    ): LineInfo =
+      WACCLineInfo(line, linesBefore, linesAfter, errorPointsAt, errorWidth)
+
+    override def raw(item: String): Raw = item
+
+    override def named(item: String): Named = item
+  }
+
+  object WACCLineInfo {
+    def genLineInfo(pos: (Int, Int))(implicit source: File): WACCLineInfo = {
+      val (line, col) = pos
+      val sourceLines = Source.fromFile(source).getLines().toArray
+      val lineBefore = line match {
+        case x if x > 1 => sourceLines(line - numLinesBeforeError - 1)
+        case _          => ""
+      }
+      val lineAfter = line match {
+        case x if x < sourceLines.length =>
+          sourceLines(line + numLinesAfterError - 1)
+        case _ => ""
+      }
+      val errorWidth = 1
+      WACCLineInfo(
+        sourceLines(line - 1),
+        Seq(lineBefore),
+        Seq(lineAfter),
+        col,
+        errorWidth
+      )
+    }
   }
 
   object UndefinedVariableError {
@@ -266,7 +358,7 @@ object errors {
   object IncorrectNumberOfArgsError {
     def genError(ident: Ident, gotNoArgs: Int, expectedNoArgs: Int)(implicit
         source: File
-    ) = {
+    ): WACCError = {
       WACCError(
         ident.pos,
         source,
@@ -278,86 +370,6 @@ object errors {
         )
       )
     }
-  }
-
-  class WACCErrorBuilder extends ErrorBuilder[WACCError] with LexToken {
-
-    val tokenParsers = Lexer.keywords.map { keyword =>
-      lookAhead(attempt(parsley.character.string(keyword)))
-    }
-
-    override def tokens: Seq[Parsley[String]] = Seq(
-      lexer.nonlexeme.names.identifier
-    ) ++ tokenParsers.toSeq
-
-    type ErrorInfoLines = WACCErrorInfoLines
-    type Source = File
-    type Position = (Int, Int)
-    type LineInfo = WACCLineInfo
-    type Message = String
-    type Messages = Seq[Message]
-    type ExpectedItems = Option[String]
-    type ExpectedLine = Option[String]
-    type UnexpectedLine = Option[String]
-    type Item = String
-    type EndOfInput = String
-    type Named = String
-    type Raw = String
-
-    override def format(
-        pos: Position,
-        source: Source,
-        lines: ErrorInfoLines
-    ): WACCError = WACCError(pos, source, lines)
-
-    override def pos(line: Int, col: Int): Position = (line, col)
-
-    override def source(source: Option[String]): Source = new File(source.get)
-
-    override def vanillaError(
-        unexpected: UnexpectedLine,
-        expected: ExpectedLine,
-        reasons: Messages,
-        line: LineInfo
-    ): ErrorInfoLines = SyntaxError(unexpected, expected, reasons, line)
-
-    override def specialisedError(
-        msgs: Messages,
-        line: LineInfo
-    ): ErrorInfoLines = SyntaxError(None, None, msgs, line)
-
-    override def combineExpectedItems(alts: Set[Item]): ExpectedItems = Some(
-      alts.mkString(", ").replaceAll(", ([^,]+)$", " or $1")
-    )
-
-    override def combineMessages(alts: Seq[Message]): Messages = alts.toList
-
-    override def unexpected(item: Option[Item]): UnexpectedLine = item
-
-    override def expected(alts: ExpectedItems): ExpectedLine = alts
-
-    override def reason(reason: String): Message = reason
-
-    override def message(msg: String): Message = msg
-
-    override def lineInfo(
-        line: String,
-        linesBefore: Seq[String],
-        linesAfter: Seq[String],
-        errorPointsAt: Int,
-        errorWidth: Int
-    ): LineInfo =
-      WACCLineInfo(line, linesBefore, linesAfter, errorPointsAt, errorWidth)
-
-    override val numLinesBefore: Int = 1
-
-    override val numLinesAfter: Int = 1
-
-    override def raw(item: String): Raw = item
-
-    override def named(item: String): Named = item
-
-    override val endOfInput: EndOfInput = "end of file"
   }
 
 }

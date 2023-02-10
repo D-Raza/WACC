@@ -1,52 +1,26 @@
 package wacc.frontend
 
-import wacc.frontend.Lexer._
-import wacc.frontend.Lexer.implicits.implicitSymbol
-import wacc.AST._
-import wacc.frontend.errors._
-import java.io.File
 import parsley.Parsley._
-import parsley.{Parsley, Result}
+import parsley.combinator.{sepBy, sepBy1, some}
 import parsley.errors.combinator._
-import parsley.combinator.{some, sepBy, sepBy1}
 import parsley.expr._
 import parsley.io.ParseFromIO
+import parsley.{Parsley, Result}
+import wacc.AST._
+import wacc.frontend.Errors._
+import wacc.frontend.Lexer._
+import wacc.frontend.Lexer.implicits.implicitSymbol
+
+import java.io.File
 
 object Parser {
 
   implicit val waccErrorBuilder: WACCErrorBuilder =
     new WACCErrorBuilder
-
-  def parse(input: File): Result[WACCError, Program] =
-    `<program>`.parseFromFile(input).get
-
-  private val statsMissingRet = new PartialFunction[List[Stat], Seq[String]] {
-
-    private def statsMissingRet(stats: List[Stat]): Boolean = {
-      stats.last match {
-        case Return(_) | Exit(_) => false
-        case Scope(scopedStats)  => statsMissingRet(scopedStats)
-        case If(_, thenStats, elseStats) =>
-          statsMissingRet(thenStats) || statsMissingRet(elseStats)
-        case While(_, doStats) => statsMissingRet(doStats)
-        case _                 => true
-      }
-    }
-
-    override def apply(stats: List[Stat]): Seq[String] = {
-      Seq("function is missing a return on all exit paths")
-    }
-
-    override def isDefinedAt(stats: List[Stat]): Boolean = {
-      statsMissingRet(stats)
-    }
-  }
-
   private lazy val `<program>` = fully(
     "begin" *> (attempt(Program(pure(Nil), sepBy1(`<stat>`, ";"))) <|>
       Program(some(`<func>`), sepBy1(`<stat>`, ";"))) <* "end"
   )
-
   // <func> ::= = <type> <ident> ‘(’ <param-list>? ‘)’ ‘is’ <stat> ‘end’
   private lazy val `<func>` = attempt(
     Func(
@@ -56,13 +30,10 @@ object Parser {
       "is" *> sepBy1(`<stat>`, ";").guardAgainst(statsMissingRet) <* "end"
     )
   )
-
   // <param-list> ::= <param> (',' <param>)*
   private lazy val `<param-list>` = sepBy(`<param>`, ",")
-
   // <param> ::= <type> <ident>
   private lazy val `<param>` = Param(`<type>`, `<ident>`)
-
   /* <stat> ::= "skip"
                | <type> <ident> "=" <expr>
                | <ident> "=" <expr>
@@ -70,7 +41,8 @@ object Parser {
                | "free" <ident>
                | "return" <expr>
                | "exit" <expr>
-               | "print" <expr>
+
+  // <program> ::= "begin" (<func>)* <stat> (";" <stat>)* "end"
                | "println" <expr>
                | "if" <expr> "then" <stat> "else" <stat> "fi"
                | "while" <expr> "do" <stat> "done"
@@ -101,18 +73,15 @@ object Parser {
         )
     )
   }
-
   // <lvalue> ::= <ident> | <array-elem> | <pair-elem>
   private lazy val `<lvalue>` : Parsley[LValue] = (
     attempt(`<array-elem>`)
       <|> `<pair-elem>`
       <|> `<ident>`
   )
-
   // <pair-elem> ::= "fst" <lvalue> | "snd" <lvalue>
   private lazy val `<pair-elem>` =
     Fst("fst" *> `<lvalue>`) <|> Snd("snd" *> `<lvalue>`)
-
   // <rvalue> ::= <expr> | <array-liter> | 'newpair' '('' <expr> ',' <expr> ')' | `<pair-elem>` | 'call' <ident> '(' <arg-list> ')'
   private lazy val `<rvalue>` = (
     `<expr>`
@@ -125,10 +94,8 @@ object Parser {
       <|> Call("call" *> `<ident>`, "(" *> `<arg-list>` <* ")")
         .label("function call")
   )
-
   // <arg-list> ::= <expr> (‘,’ <expr>)*
   private lazy val `<arg-list>` = sepBy(`<expr>`, ",")
-
   // <type> ::= <base-type> | <array-type> | <pair-type>
   private lazy val `<type>` = chain
     .postfix(`<base-type>` <|> `<pair-type>`, `<array-type>`)
@@ -136,7 +103,6 @@ object Parser {
     .explain(
       "valid types are int, bool, char, string, pair, and arrays of any of these types"
     )
-
   // <base-type> ::= 'int' | 'bool' | 'char' | 'string'
   private lazy val `<base-type>` = (
     (IntType <# "int")
@@ -144,21 +110,17 @@ object Parser {
       <|> (CharType <# "char")
       <|> (StringType <# "string")
   )
-
   // <array-type> ::= <type> '[' ']'
   private lazy val `<array-type>` = ArrayType <# "[]".label("[] (array type)")
-
   // <pair-type> ::= ‘pair’ ‘(’ <pair-elem-type> ‘,’ <pair-elem-type> ‘)’
   private lazy val `<pair-type>` = PairType(
     "pair" *> "(" *> `<pair-elem-type>` <* ",",
     `<pair-elem-type>` <* ")"
   )
-
   // <pair-elem-type> ::= <base-type> | <array-type> | "pair"
   private lazy val `<pair-elem-type>` : Parsley[PairElemType] = attempt(
     chain.postfix1(`<base-type>` <|> `<pair-type>`, `<array-type>`)
   ) <|> `<base-type>` <|> (InnerPairType <# "pair")
-
   private lazy val `<expr>` : Parsley[Expr] = precedence(
     SOps(InfixR)(Or <# "||".label("binary operator")) +:
       SOps(InfixR)(And <# "&&".label("binary operator")) +:
@@ -199,10 +161,8 @@ object Parser {
         Null <# "null"
       )
   )
-
   // <ident> ::= (‘_’ | ‘a’-‘z’ | ‘A’-‘Z’) (‘–’ | ‘a’-‘z’ | ‘A’-‘Z’ | ‘0’-‘9’)*
   private lazy val `<ident>` = Ident(VAR_ID)
-
   // <array-elem> ::= <ident> ('[' <expr> ']')+
   private lazy val `<array-elem>` =
     ArrayElem(
@@ -210,10 +170,33 @@ object Parser {
       some("[".label("index (like `xs[idx]`)") *> `<expr>` <* "]")
     )
       .label("array element")
-
   // <array-liter> ::= '[' (<expr> (',' <expr>)*)? ']'
   private lazy val `<array-liter>` = ArrayLit(
     "[" *> sepBy(`<expr>`, ",") <* "]"
   ).label("array literal")
+  private val statsMissingRet = new PartialFunction[List[Stat], Seq[String]] {
+
+    private def statsMissingRet(stats: List[Stat]): Boolean = {
+      stats.last match {
+        case Return(_) | Exit(_) => false
+        case Scope(scopedStats)  => statsMissingRet(scopedStats)
+        case If(_, thenStats, elseStats) =>
+          statsMissingRet(thenStats) || statsMissingRet(elseStats)
+        case While(_, doStats) => statsMissingRet(doStats)
+        case _                 => true
+      }
+    }
+
+    override def apply(stats: List[Stat]): Seq[String] = {
+      Seq("function is missing a return on all exit paths")
+    }
+
+    override def isDefinedAt(stats: List[Stat]): Boolean = {
+      statsMissingRet(stats)
+    }
+  }
+
+  def parse(input: File): Result[WACCError, Program] =
+    `<program>`.parseFromFile(input).get
 
 }

@@ -12,36 +12,47 @@ object genericbridgesPos {
   }
 
   trait ParserBridgePos0[R] extends ParserSingletonBridgePos[R] {
-    def apply()(pos: (Int, Int)): R
     override final def con(pos: (Int, Int)): R = this.apply()(pos)
+
+    def apply()(pos: (Int, Int)): R
   }
 
   trait ParserBridgePos1[-A, +B] extends ParserSingletonBridgePos[A => B] {
-    def apply(x: A)(pos: (Int, Int)): B
-    def apply(x: Parsley[A]): Parsley[B] = pos <**> x.map(this.apply(_) _)
     override final def con(pos: (Int, Int)): A => B = this.apply(_)(pos)
+
+    def apply(x: A)(pos: (Int, Int)): B
+
+    def apply(x: Parsley[A]): Parsley[B] = pos <**> x.map(this.apply(_) _)
   }
 
   trait ParserBridgePos2[-A, -B, +C]
       extends ParserSingletonBridgePos[(A, B) => C] {
+    override final def con(pos: (Int, Int)): (A, B) => C = this.apply(_, _)(pos)
+
     def apply(x: A, y: B)(pos: (Int, Int)): C
+
     def apply(x: Parsley[A], y: => Parsley[B]): Parsley[C] =
       pos <**> (x, y).zipped(this.apply(_, _) _)
-    override final def con(pos: (Int, Int)): (A, B) => C = this.apply(_, _)(pos)
   }
 
   trait ParserBridgePos3[-A, -B, -C, +D]
       extends ParserSingletonBridgePos[(A, B, C) => D] {
-    def apply(x: A, y: B, z: C)(pos: (Int, Int)): D
-    def apply(x: Parsley[A], y: => Parsley[B], z: => Parsley[C]): Parsley[D] =
-      pos <**> (x, y, z).zipped(this.apply(_, _, _) _)
     override final def con(pos: (Int, Int)): (A, B, C) => D =
       this.apply(_, _, _)(pos)
+
+    def apply(x: A, y: B, z: C)(pos: (Int, Int)): D
+
+    def apply(x: Parsley[A], y: => Parsley[B], z: => Parsley[C]): Parsley[D] =
+      pos <**> (x, y, z).zipped(this.apply(_, _, _) _)
   }
 
   trait ParserBridgePos4[-A, -B, -C, -D, +E]
       extends ParserSingletonBridgePos[(A, B, C, D) => E] {
+    override final def con(pos: (Int, Int)): (A, B, C, D) => E =
+      this.apply(_, _, _, _)(pos)
+
     def apply(x: A, y: B, z: C, w: D)(pos: (Int, Int)): E
+
     def apply(
         x: Parsley[A],
         y: => Parsley[B],
@@ -49,8 +60,6 @@ object genericbridgesPos {
         w: => Parsley[D]
     ): Parsley[E] =
       pos <**> (x, y, z, w).zipped(this.apply(_, _, _, _) _)
-    override final def con(pos: (Int, Int)): (A, B, C, D) => E =
-      this.apply(_, _, _, _)(pos)
   }
 }
 
@@ -59,62 +68,24 @@ object AST {
 
   val NULLPOS: (Int, Int) = (-1, -1)
 
-  /* Case Classes and Traits */
-  case class Program(funcs: List[Func], stat: List[Stat])(val pos: (Int, Int))
-  case class Func(
-      ty: Type,
-      ident: Ident,
-      paramList: List[Param],
-      stats: List[Stat]
-  )(
-      val pos: (Int, Int)
-  )
-  case class Param(ty: Type, ident: Ident)(val pos: (Int, Int))
-
   // Statements
   sealed trait Stat {
     val pos: (Int, Int)
   }
-  case class Skip()(val pos: (Int, Int)) extends Stat
-  case class Assign(lValue: LValue, y: RValue)(val pos: (Int, Int)) extends Stat
-  case class Declare(ty: Type, x: Ident, y: RValue)(val pos: (Int, Int))
-      extends Stat
-  case class Read(lValue: LValue)(val pos: (Int, Int)) extends Stat
-  case class Free(expr: Expr)(val pos: (Int, Int)) extends Stat
-  case class Return(expr: Expr)(val pos: (Int, Int)) extends Stat
-  case class Exit(expr: Expr)(val pos: (Int, Int)) extends Stat
-  case class Print(expr: Expr)(val pos: (Int, Int)) extends Stat
-  case class Println(expr: Expr)(val pos: (Int, Int)) extends Stat
-  case class If(cond: Expr, thenStat: List[Stat], elseStat: List[Stat])(
-      val pos: (Int, Int)
-  ) extends Stat
-  case class While(cond: Expr, doStat: List[Stat])(val pos: (Int, Int))
-      extends Stat
-  case class Scope(stats: List[Stat])(val pos: (Int, Int)) extends Stat
 
   // LValues
   sealed trait LValue {
     val pos: (Int, Int)
   }
-  case class Ident(name: String)(val pos: (Int, Int)) extends LValue with Expr {
-    override def toString(): String = s"identifier ${name}"
-  }
-  case class ArrayElem(ident: Ident, xs: List[Expr])(val pos: (Int, Int))
-      extends LValue
-      with Expr
+
   sealed trait PairElem extends LValue with RValue
-  case class Fst(p: LValue)(val pos: (Int, Int)) extends PairElem
-  case class Snd(p: LValue)(val pos: (Int, Int)) extends PairElem
 
   // RValues
   sealed trait RValue {
     val pos: (Int, Int)
   }
+
   sealed trait Expr extends RValue
-  case class ArrayLit(xs: List[Expr])(val pos: (Int, Int)) extends RValue
-  case class NewPair(fst: Expr, snd: Expr)(val pos: (Int, Int)) extends RValue
-  case class Call(x: Ident, args: List[Expr])(val pos: (Int, Int))
-      extends RValue
 
 // Types
   sealed trait WACCType {
@@ -138,6 +109,7 @@ object AST {
     def positioned(pos: (Int, Int)): Type
     def eraseInnerTypes: PairElemType
   }
+
   sealed trait PairElemType extends WACCType {
     def asType: Type
   }
@@ -147,33 +119,102 @@ object AST {
     def eraseInnerTypes: PairElemType = this
   }
 
+  // Base Types
+  sealed trait BaseType extends GenericType
+
+  sealed trait PairLiter extends Expr
+
+  /* Case Classes and Traits */
+  case class Program(funcs: List[Func], stat: List[Stat])(val pos: (Int, Int))
+
+  case class Func(
+      ty: Type,
+      ident: Ident,
+      paramList: List[Param],
+      stats: List[Stat]
+  )(
+      val pos: (Int, Int)
+  )
+
+  case class Param(ty: Type, ident: Ident)(val pos: (Int, Int))
+
+  case class Skip()(val pos: (Int, Int)) extends Stat
+
+  case class Assign(lValue: LValue, y: RValue)(val pos: (Int, Int)) extends Stat
+
+  case class Declare(ty: Type, x: Ident, y: RValue)(val pos: (Int, Int))
+      extends Stat
+
+  case class Read(lValue: LValue)(val pos: (Int, Int)) extends Stat
+
+  case class Free(expr: Expr)(val pos: (Int, Int)) extends Stat
+
+  case class Return(expr: Expr)(val pos: (Int, Int)) extends Stat
+
+  case class Exit(expr: Expr)(val pos: (Int, Int)) extends Stat
+
+  case class Print(expr: Expr)(val pos: (Int, Int)) extends Stat
+
+  case class Println(expr: Expr)(val pos: (Int, Int)) extends Stat
+
+  case class If(cond: Expr, thenStat: List[Stat], elseStat: List[Stat])(
+      val pos: (Int, Int)
+  ) extends Stat
+
+  case class While(cond: Expr, doStat: List[Stat])(val pos: (Int, Int))
+      extends Stat
+
+  case class Scope(stats: List[Stat])(val pos: (Int, Int)) extends Stat
+
+  case class Ident(name: String)(val pos: (Int, Int)) extends LValue with Expr {
+    override def toString(): String = s"identifier ${name}"
+  }
+
+  case class ArrayElem(ident: Ident, xs: List[Expr])(val pos: (Int, Int))
+      extends LValue
+      with Expr
+
+  case class Fst(p: LValue)(val pos: (Int, Int)) extends PairElem
+
+  case class Snd(p: LValue)(val pos: (Int, Int)) extends PairElem
+
+  case class ArrayLit(xs: List[Expr])(val pos: (Int, Int)) extends RValue
+
+  case class NewPair(fst: Expr, snd: Expr)(val pos: (Int, Int)) extends RValue
+
+  case class Call(x: Ident, args: List[Expr])(val pos: (Int, Int))
+      extends RValue
+
   case class AnyType()(val pos: (Int, Int)) extends GenericType {
     def positioned(pos: (Int, Int)): AnyType = AnyType()(pos)
     override def toString(): String = "any"
   }
+
   case class ErrorType()(val pos: (Int, Int)) extends GenericType {
     def positioned(pos: (Int, Int)): ErrorType = ErrorType()(pos)
     override def toString(): String = "ERROR"
   }
+
   case class UnknownType()(val pos: (Int, Int)) extends GenericType {
     def positioned(pos: (Int, Int)): UnknownType = UnknownType()(pos)
     override def toString(): String = "?"
   }
 
-  // Base Types
-  sealed trait BaseType extends GenericType
   case class IntType()(val pos: (Int, Int)) extends BaseType {
     def positioned(pos: (Int, Int)): IntType = IntType()(pos)
     override def toString(): String = "int"
   }
+
   case class BoolType()(val pos: (Int, Int)) extends BaseType {
     def positioned(pos: (Int, Int)): BoolType = BoolType()(pos)
     override def toString(): String = "bool"
   }
+
   case class CharType()(val pos: (Int, Int)) extends BaseType {
     def positioned(pos: (Int, Int)): CharType = CharType()(pos)
     override def toString(): String = "char"
   }
+
   case class StringType()(val pos: (Int, Int)) extends BaseType {
     def positioned(pos: (Int, Int)): StringType = StringType()(pos)
     override def toString(): String = "string"
@@ -193,6 +234,7 @@ object AST {
     def positioned(pos: (Int, Int)): PairType = PairType(fstType, sndType)(pos)
     override def toString(): String = s"pair($fstType, $sndType)"
   }
+
   case class InnerPairType()(val pos: (Int, Int)) extends PairElemType {
     def asType: Type =
       PairType(UnknownType()(NULLPOS), UnknownType()(NULLPOS))(pos)
@@ -202,11 +244,13 @@ object AST {
 
   // Literals
   case class IntegerLiter(x: Int)(val pos: (Int, Int)) extends Expr
+
   case class BoolLiter(x: Boolean)(val pos: (Int, Int)) extends Expr
+
   case class CharLiter(x: Char)(val pos: (Int, Int)) extends Expr
+
   case class StrLiter(x: String)(val pos: (Int, Int)) extends Expr
 
-  sealed trait PairLiter extends Expr
   case class Null()(val pos: (Int, Int)) extends PairLiter
 
   // Binary operators

@@ -1,7 +1,8 @@
 package wacc.frontend
 
 import wacc.AST._
-import wacc.frontend.errors._
+import wacc.frontend.Errors._
+
 import java.io.File
 import scala.collection.mutable
 

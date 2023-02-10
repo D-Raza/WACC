@@ -1,10 +1,11 @@
 package wacc
 
+import parsley.{Failure, Success}
 import wacc.frontend.Parser._
 import wacc.frontend.SemanticAnalyser._
+
 import java.io.File
 import scala.io.Source
-import parsley.{Success, Failure}
 
 object Compiler {
   def main(args: Array[String]): Unit = {
