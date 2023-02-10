@@ -276,7 +276,6 @@ object Errors {
           sourceLines(line + numLinesAfterError - 1)
         case _ => ""
       }
-      // val errorWidth = 1
       WACCLineInfo(
         sourceLines(line - 1),
         Seq(lineBefore),
@@ -289,12 +288,14 @@ object Errors {
 
   object UndefinedVariableError {
     def genError(id: Ident)(implicit source: File): WACCError = {
+      val pos = id.pos
+      val errorWidth = id.name.length()
       WACCError(
-        id.pos,
+        pos,
         source,
         new UndefinedVariableError(
           id,
-          WACCLineInfo.genLineInfo(id.pos, id.toString().length())
+          WACCLineInfo.genLineInfo(id.pos, errorWidth)
         )
       )
     }
@@ -302,12 +303,14 @@ object Errors {
 
   object RedefinedVariableError {
     def genError(id: Ident)(implicit source: File): WACCError = {
+      val pos = id.pos
+      val errorWidth = id.name.length()
       WACCError(
-        id.pos,
+        pos,
         source,
         new RedefinedVariableError(
           id,
-          WACCLineInfo.genLineInfo(id.pos, id.toString().length())
+          WACCLineInfo.genLineInfo(pos, errorWidth)
         )
       )
     }
@@ -315,12 +318,14 @@ object Errors {
 
   object UndefinedFunctionError {
     def genError(id: Ident)(implicit source: File): WACCError = {
+      val pos = id.pos
+      val errorWidth = id.name.length()
       WACCError(
-        id.pos,
+        pos,
         source,
         new UndefinedFunctionError(
           id,
-          WACCLineInfo.genLineInfo(id.pos, id.toString().length())
+          WACCLineInfo.genLineInfo(pos, errorWidth)
         )
       )
     }
@@ -328,12 +333,14 @@ object Errors {
 
   object RedefinedFunctionError {
     def genError(id: Ident)(implicit source: File): WACCError = {
+      val pos = id.pos
+      val errorWidth = id.name.length()
       WACCError(
-        id.pos,
+        pos,
         source,
         new RedefinedFunctionError(
           id,
-          WACCLineInfo.genLineInfo(id.pos, id.toString().length())
+          WACCLineInfo.genLineInfo(pos, errorWidth)
         )
       )
     }
@@ -361,12 +368,14 @@ object Errors {
 
   object UnexpectedReturnError {
     def genError(stat: Stat)(implicit source: File): WACCError = {
+      val pos = stat.pos
+      val errorWidth = "return".length()
       WACCError(
-        stat.pos,
+        pos,
         source,
         new UnexpectedReturnError(
           stat,
-          WACCLineInfo.genLineInfo(stat.pos, stat.toString().length())
+          WACCLineInfo.genLineInfo(pos, errorWidth)
         ) // return.length
       )
     }
@@ -392,14 +401,15 @@ object Errors {
     def genError(ident: Ident, gotNoArgs: Int, expectedNoArgs: Int)(implicit
         source: File
     ): WACCError = {
+      val pos = ident.pos
       WACCError(
-        ident.pos,
+        pos,
         source,
         new IncorrectNumberOfArgsError(
           ident,
           gotNoArgs,
           expectedNoArgs,
-          WACCLineInfo.genLineInfo(ident.pos, 1)
+          WACCLineInfo.genLineInfo(pos, 1)
         )
       )
     }
