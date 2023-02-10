@@ -5,25 +5,26 @@ stages:
   - build
   - test
 
-.install_dependencies:
-  before_script:
-    - apt-get update
-    - apt-get install -y make
+# NOTE: For shared runners
+# .install_dependencies:
+#   before_script:
+#     - apt-get update
+#     - apt-get install -y make
 
 lint-job:
   stage: lint
-  extends: .install_dependencies
+  # extends: .install_dependencies
   script:
     - make lint
 
 build-job:
   stage: build
-  extends: .install_dependencies
+  # extends: .install_dependencies
   script:
     - make build
 
 test-job:
   stage: test
-  extends: .install_dependencies
+  # extends: .install_dependencies
   script:
     - make test
