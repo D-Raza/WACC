@@ -262,7 +262,7 @@ object Errors {
   }
 
   object WACCLineInfo {
-    def genLineInfo(pos: (Int, Int))(implicit source: File): WACCLineInfo = {
+    def genLineInfo(pos: (Int, Int), idLength: Int)(implicit source: File): WACCLineInfo = {
       val (line, col) = pos
       val sourceLines = Source.fromFile(source).getLines().toArray
       val lineBefore = line match {
@@ -274,13 +274,13 @@ object Errors {
           sourceLines(line + numLinesAfterError - 1)
         case _ => ""
       }
-      val errorWidth = 1
+      // val errorWidth = 1
       WACCLineInfo(
         sourceLines(line - 1),
         Seq(lineBefore),
         Seq(lineAfter),
         col,
-        errorWidth
+        idLength
       )
     }
   }
@@ -290,7 +290,7 @@ object Errors {
       WACCError(
         id.pos,
         source,
-        new UndefinedVariableError(id, WACCLineInfo.genLineInfo(id.pos))
+        new UndefinedVariableError(id, WACCLineInfo.genLineInfo(id.pos, id.toString().length()))
       )
     }
   }
@@ -300,7 +300,7 @@ object Errors {
       WACCError(
         id.pos,
         source,
-        new RedefinedVariableError(id, WACCLineInfo.genLineInfo(id.pos))
+        new RedefinedVariableError(id, WACCLineInfo.genLineInfo(id.pos, id.toString().length()))
       )
     }
   }
@@ -310,7 +310,7 @@ object Errors {
       WACCError(
         id.pos,
         source,
-        new UndefinedFunctionError(id, WACCLineInfo.genLineInfo(id.pos))
+        new UndefinedFunctionError(id, WACCLineInfo.genLineInfo(id.pos, id.toString().length()))
       )
     }
   }
@@ -320,7 +320,7 @@ object Errors {
       WACCError(
         id.pos,
         source,
-        new RedefinedFunctionError(id, WACCLineInfo.genLineInfo(id.pos))
+        new RedefinedFunctionError(id, WACCLineInfo.genLineInfo(id.pos, id.toString().length()))
       )
     }
   }
@@ -339,7 +339,7 @@ object Errors {
           gotType,
           expectedType,
           additionalPosInfo,
-          WACCLineInfo.genLineInfo(pos)
+          WACCLineInfo.genLineInfo(pos, 1)
         )
       )
     }
@@ -350,7 +350,7 @@ object Errors {
       WACCError(
         stat.pos,
         source,
-        new UnexpectedReturnError(stat, WACCLineInfo.genLineInfo(stat.pos))
+        new UnexpectedReturnError(stat, WACCLineInfo.genLineInfo(stat.pos, stat.toString().length())) // return.length
       )
     }
   }
@@ -365,7 +365,7 @@ object Errors {
         new ArrayDimensionMismatchError(
           gotDims,
           expectedDims,
-          WACCLineInfo.genLineInfo(pos)
+          WACCLineInfo.genLineInfo(pos, 1)
         )
       )
     }
@@ -382,7 +382,7 @@ object Errors {
           ident,
           gotNoArgs,
           expectedNoArgs,
-          WACCLineInfo.genLineInfo(ident.pos)
+          WACCLineInfo.genLineInfo(ident.pos, 1)
         )
       )
     }
