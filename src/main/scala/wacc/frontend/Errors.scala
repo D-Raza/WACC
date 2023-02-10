@@ -40,7 +40,7 @@ object Errors {
     }
 
     private def errorPointer(errorCol: Int, errorWidth: Int) = {
-      val pointerSpace = " " * (errorCol - 1)
+      val pointerSpace = " " * (errorCol)
       if (errorWidth == 0)
         pointerSpace + "^"
       else
@@ -54,15 +54,21 @@ object Errors {
       lines: WACCErrorInfoLines
   ) {
     override def toString: String = {
+      val (line, col) = pos
       val errorType = lines match {
         case SyntaxError(_, _, _, _) => "Syntax error"
         case _: SemanticError        => "Semantic error"
       }
-      val (line, col) = pos
+
+      val lineInfo = errorType match {
+        case "Semantic error" =>
+          lines.lineInfo.copy(errorCol = lines.lineInfo.errorCol - 1)
+        case _ => lines.lineInfo
+      }
 
       s"""$errorType in ${source.getName} at line $line, col $col:
           |${lines.errorLines.mkString("\n")}
-          |${lines.lineInfo.genErrorInfo}
+          |${lineInfo.genErrorInfo}
           |
         """.stripMargin
     }
