@@ -29,7 +29,7 @@ object Errors {
       errorCol: Int,
       errorWidth: Int
   ) {
-    private val infoLineStart = " >"
+    private val infoLineStart = ">"
     def genErrorInfo: String = {
       (linesBefore.map(line => s"$infoLineStart$line") ++:
         Seq(
@@ -40,11 +40,11 @@ object Errors {
     }
 
     private def errorPointer(errorCol: Int, errorWidth: Int) = {
-      val pointerSpace = " " * errorCol
+      val pointerSpace = " " * (errorCol - 1)
       if (errorWidth == 0)
         pointerSpace + "^"
       else
-        pointerSpace + "^" * errorWidth
+        pointerSpace + ("^" * errorWidth)
     }
   }
 
@@ -225,13 +225,7 @@ object Errors {
         reasons: Messages,
         line: LineInfo
     ): ErrorInfoLines = {
-      val newLineInfo = unexpected match {
-        case Some(unexpected) =>
-          line.copy(errorWidth = unexpected.length)
-        case None => line
-      }
-
-      SyntaxError(unexpected, expected, reasons, newLineInfo)
+      SyntaxError(unexpected, expected, reasons, line)
     }
 
     override def specialisedError(
