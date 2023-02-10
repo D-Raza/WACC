@@ -107,9 +107,11 @@ object Lexer {
   val NEGATE: Parsley[Unit] =
     lexer.lexeme(attempt(("-") *> notFollowedBy(digit))).hide
   val INTEGER: Parsley[Int] =
-    lexer.lexeme.numeric.integer.decimal32.label("integer")
+    lexer.lexeme.numeric.integer.decimal32.label("integer literal")
   val BOOL: Parsley[Boolean] =
-    lexer.lexeme(attempt("true" #> true <|> "false" #> false)).label("boolean")
+    lexer
+      .lexeme(attempt("true" #> true <|> "false" #> false))
+      .label("boolean literal")
   val STRING: Parsley[String] =
     lexer.lexeme.text.string.ascii.label("string literal")
   val CHAR: Parsley[Char] =

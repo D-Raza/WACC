@@ -69,28 +69,28 @@ object Parser {
                | "begin" <stat> "end"
                | <stat> ";" <stat> */
   private lazy val `<stat>` : Parsley[Stat] = (
-    Skip <# "skip"
+    Skip <# "skip".label("skip")
       <|> Declare(`<type>`, `<ident>`, "=" *> `<rvalue>`)
       <|> Assign(`<lvalue>`, "=" *> `<rvalue>`)
-      <|> Read("read" *> `<lvalue>`)
-      <|> Free("free" *> `<expr>`)
-      <|> Return("return" *> `<expr>`)
-      <|> Exit("exit" *> `<expr>`)
-      <|> Print("print" *> `<expr>`)
-      <|> Println("println" *> `<expr>`)
+      <|> Read("read" *> `<lvalue>`).label("read")
+      <|> Free("free" *> `<expr>`).label("free")
+      <|> Return("return" *> `<expr>`).label("return")
+      <|> Exit("exit" *> `<expr>`).label("exit")
+      <|> Print("print" *> `<expr>`).label("print")
+      <|> Println("println" *> `<expr>`).label("println")
       <|> If(
         "if" *> `<expr>`,
         "then" *> sepBy1(`<stat>`, ";"),
         "else" *> sepBy1(`<stat>`, ";") <* "fi"
-      )
+      ).label("if statement")
       <|> While(
         "while" *> `<expr>`,
-        "do" *> sepBy1(`<stat>`, ";") <* "done"
-      )
+        "do" *> sepBy1(`<stat>`, ";") <* "done".explain("unclosed while loop")
+      ).label("while loop")
       <|> Scope(
         "begin" *> sepBy1(`<stat>`, ";") <* "end"
       )
-  ).label("statement")
+  ) // .label("statement")
 
   // <lvalue> ::= <ident> | <array-elem> | <pair-elem>
   private lazy val `<lvalue>` : Parsley[LValue] = (
@@ -136,7 +136,7 @@ object Parser {
   )
 
   // <array-type> ::= <type> '[' ']'
-  private lazy val `<array-type>` = ArrayType <# "[]"
+  private lazy val `<array-type>` = ArrayType <# "[]".label("[] (array type)")
 
   // <pair-type> ::= ‘pair’ ‘(’ <pair-elem-type> ‘,’ <pair-elem-type> ‘)’
   private lazy val `<pair-type>` = PairType(
@@ -150,33 +150,33 @@ object Parser {
   ) <|> `<base-type>` <|> (InnerPairType <# "pair")
 
   private lazy val `<expr>` : Parsley[Expr] = precedence(
-    SOps(InfixR)(Or <# "||") +:
-      SOps(InfixR)(And <# "&&") +:
+    SOps(InfixR)(Or <# "||".label("binary operator")) +:
+      SOps(InfixR)(And <# "&&".label("binary operator")) +:
       SOps(InfixN)(
-        Equal <# "==".label("operator"),
-        NotEqual <# "!=".label("operator")
+        Equal <# "==".label("binary operator"),
+        NotEqual <# "!=".label("binary operator")
       )
       +: SOps(InfixN)(
-        LT <# "<".label("operator"),
-        LTE <# "<=".label("operator"),
-        GT <# ">".label("operator"),
-        GTE <# ">=".label("operator")
+        LT <# "<".label("binary operator"),
+        LTE <# "<=".label("binary operator"),
+        GT <# ">".label("binary operator"),
+        GTE <# ">=".label("binary operator")
       )
       +: SOps(InfixL)(
-        Add <# "+".label("operator"),
-        Sub <# "-".label("operator")
+        Add <# "+".label("binary operator"),
+        Sub <# "-".label("binary operator")
       )
       +: SOps(InfixL)(
-        Mult <# "*".label("operator"),
-        Div <# "/".label("operator"),
-        Mod <# "%".label("operator")
+        Mult <# "*".label("binary operator"),
+        Div <# "/".label("binary operator"),
+        Mod <# "%".label("binary operator")
       )
       +: SOps(Prefix)(
-        Not <# "!".label("operator"),
-        Neg <# NEGATE,
-        Len <# "len".label("operator"),
-        Ord <# "ord".label("operator"),
-        Chr <# "chr".label("operator")
+        Not <# "!".label("unary operator"),
+        Neg <# NEGATE.label("unary operator"),
+        Len <# "len".label("unary operator"),
+        Ord <# "ord".label("unary operator"),
+        Chr <# "chr".label("unary operator")
       )
       +: Atoms(
         IntegerLiter(INTEGER),

@@ -604,12 +604,22 @@ object SemanticAnalyser {
     if (!argTypes.exists(expr1Type equiv _)) {
       (
         ErrorType()(expr1.pos),
-        errors :+ TypeError.genError(expr1Type, Set(expr2Type), expr1.pos, "")
+        errors :+ TypeError.genError(
+          expr1Type,
+          argTypes,
+          expr1.pos,
+          ""
+        ) // Set(expr2Type)
       )
     } else if (!argTypes.exists(expr2Type equiv _)) {
       (
         ErrorType()(expr2.pos),
-        errors :+ TypeError.genError(expr2Type, Set(expr1Type), expr2.pos, "")
+        errors :+ TypeError.genError(
+          expr2Type,
+          argTypes,
+          expr2.pos,
+          ""
+        ) // Set(expr1Type)
       )
     } else if (!((expr1Type equiv expr2Type) || (expr2Type equiv expr1Type))) {
       (

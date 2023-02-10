@@ -16,14 +16,15 @@ object errors {
       errorPointsAt: Int,
       errorWidth: Int
   ) {
-    private val errorLineStart = ">"
-    private def errorPointer(caretAt: Int, errorWidth: Int) = s"${" " * caretAt}${"^" * errorWidth}"
+    private val errorLineStart = "  >"
+    private def errorPointer(caretAt: Int, errorWidth: Int) =
+      s"${" " * caretAt}${"^" * errorWidth}"
 
     def genErrorInfo: String = {
       (linesBefore.map(line => s"$errorLineStart$line") ++:
         Seq(
           s"$errorLineStart$line",
-          s"${" " * errorLineStart.length}${errorPointer(errorPointsAt, errorWidth)}"
+          s"$errorLineStart${errorPointer(errorPointsAt, errorWidth)}"
         ) ++:
         linesAfter.map(line => s"$errorLineStart$line")).mkString("\n")
     }
@@ -36,7 +37,13 @@ object errors {
       val lineBefore = if (line > 1) sourceLines(line - 2) else ""
       val lineAfter = if (line < sourceLines.length) sourceLines(line) else ""
       val errorWidth = 1
-      WACCLineInfo(sourceLines(line - 1), Seq(lineBefore), Seq(lineAfter), col, errorWidth)
+      WACCLineInfo(
+        sourceLines(line - 1),
+        Seq(lineBefore),
+        Seq(lineAfter),
+        col,
+        errorWidth
+      )
     }
   }
 
@@ -57,7 +64,7 @@ object errors {
       }
       val (line, col) = pos
 
-      s"""${errorType} in $source at line ${line}, col ${col}:
+      s"""${errorType} in ${source.getName()} at line ${line}, col ${col}:
           |${lines.errorLines.mkString("\n")}
           |${lines.lineInfo.genErrorInfo}
           |
@@ -121,7 +128,7 @@ object errors {
       lineInfo: WACCLineInfo
   ) extends SemanticError {
     override val errorLines: Seq[String] = Seq(
-      s"Incorrect number of arguments for function ${ident.name}. Expected ${gotNoArgs} arguments, got ${gotNoArgs} arguments"
+      s"Incorrect number of arguments for function ${ident.name}. Expected ${expectedNoArgs} arguments, got ${gotNoArgs} arguments"
     )
   }
   case class NullException(lineInfo: WACCLineInfo) extends SemanticError {
@@ -158,7 +165,7 @@ object errors {
   case class UnexpectedReturnError(stat: Stat, lineInfo: WACCLineInfo)
       extends SemanticError {
     override val errorLines: Seq[String] = Seq(
-      "Return statement outside function"
+      "Return outside function is not allowed"
     )
   }
 
@@ -323,9 +330,10 @@ object errors {
         line: LineInfo
     ): ErrorInfoLines = SyntaxError(None, None, msgs, line)
 
-    override def combineExpectedItems(alts: Set[Item]): ExpectedItems = Option(
-      alts.toList.filter(_.nonEmpty).mkString(", ")
+    override def combineExpectedItems(alts: Set[Item]): ExpectedItems = Some(
+      alts.mkString(", ").replaceAll(", ([^,]+)$", " or $1")
     )
+    // Option(alts.toList.filter(_.nonEmpty).mkString(", "))
 
     override def combineMessages(alts: Seq[Message]): Messages = alts.toList
 
@@ -343,7 +351,8 @@ object errors {
         linesAfter: Seq[String],
         errorPointsAt: Int,
         errorWidth: Int
-    ): LineInfo = WACCLineInfo(line, linesBefore, linesAfter, errorPointsAt, errorWidth)
+    ): LineInfo =
+      WACCLineInfo(line, linesBefore, linesAfter, errorPointsAt, errorWidth)
 
     override val numLinesBefore: Int = 1
 
@@ -353,7 +362,7 @@ object errors {
 
     override def named(item: String): Named = item
 
-    override val endOfInput: EndOfInput = "end of input"
+    override val endOfInput: EndOfInput = "end of file"
 
     // TillNextWhitespace
     override def unexpectedToken(
