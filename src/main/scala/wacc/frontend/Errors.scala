@@ -18,7 +18,7 @@ object errors {
       errorPointsAt: Int,
       errorWidth: Int
   ) {
-    private val errorLineStart = " |"
+    private val errorLineStart = " >"
     private def errorPointer(caretAt: Int, errorWidth: Int) =
       s"${" " * caretAt}${"^" * errorWidth}"
 
@@ -66,17 +66,11 @@ object errors {
       }
       val (line, col) = pos
 
-      val genErrorInfoWithLineNumbers = lines.lineInfo.genErrorInfo
-        .split("\n")
-        .zipWithIndex
-        .map { case (l, index) => s"${index + line - 1}$l" }
-        .mkString("\n")
-
       s"""${errorType} in ${source.getName()} at line ${line}, col ${col}:
-          >${lines.errorLines.mkString("\n")}
-          >${genErrorInfoWithLineNumbers}
-          >
-        """.stripMargin('>')
+          |${lines.errorLines.mkString("\n")}
+          |${lines.lineInfo.genErrorInfo}
+          |
+        """.stripMargin
     }
   }
 
