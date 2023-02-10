@@ -11,10 +11,13 @@ format:
 test: build
 	bash test.sh $(milestone)
 
+check: build
+	sbt test
+
 build:
 	sbt compile assembly 
 
 clean:
 	sbt clean && rm -rf wacc_examples/ wacc-33-compiler.jar test.log
 
-.PHONY: all lint format test build clean 
+.PHONY: all lint format test check build clean 

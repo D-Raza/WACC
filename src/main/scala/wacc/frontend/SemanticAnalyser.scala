@@ -17,7 +17,7 @@ object SemanticAnalyser {
       case Program(funcs, stats) => {
         funcs.foreach(func => {
           if (functionDefs contains func.ident)
-            errors += RedefinedFunction.genError(func.ident)
+            errors += RedefinedFunctionError.genError(func.ident)
 
           functionDefs += (func.ident -> (func.ty, func.paramList.map(_.ty)))
         })
@@ -76,7 +76,7 @@ object SemanticAnalyser {
           val (rValueType, rValueErrors) = evalTypeOfRValue(rvalue, stat)
           errors ++= rValueErrors
           if (!(rValueType equiv ty))
-            errors += TypeError.genError(
+            errors += TypeMismatchError.genError(
               rValueType,
               Set(ty),
               rvalue.pos,
@@ -92,7 +92,7 @@ object SemanticAnalyser {
 
           (lValueType, rValueType) match {
             case (UnknownType(), UnknownType()) =>
-              errors += TypeError.genError(
+              errors += TypeMismatchError.genError(
                 rValueType,
                 Set(lValueType),
                 rValue.pos,
@@ -104,7 +104,7 @@ object SemanticAnalyser {
                   NULLPOS
                 ))
               )
-                errors += TypeError.genError(
+                errors += TypeMismatchError.genError(
                   rValueType,
                   Set(lValueType),
                   rValue.pos,
@@ -121,7 +121,7 @@ object SemanticAnalyser {
           lValueType match {
             case IntType() | CharType() => ()
             case _ =>
-              errors += TypeError.genError(
+              errors += TypeMismatchError.genError(
                 lValueType,
                 Set(IntType()(NULLPOS), CharType()(NULLPOS)),
                 lValue.pos,
@@ -137,7 +137,7 @@ object SemanticAnalyser {
           exprType match {
             case PairType(_, _) | ArrayType(_) =>
             case _ =>
-              errors += TypeError.genError(
+              errors += TypeMismatchError.genError(
                 exprType,
                 Set(
                   ArrayType(AnyType()(NULLPOS))(NULLPOS),
@@ -156,7 +156,7 @@ object SemanticAnalyser {
           (returnType, exprType) match {
             case (Some(returnType), exprType) =>
               if (!(returnType equiv exprType))
-                errors += TypeError.genError(
+                errors += TypeMismatchError.genError(
                   exprType,
                   Set(returnType),
                   expr.pos,
@@ -172,7 +172,7 @@ object SemanticAnalyser {
           exprType match {
             case IntType() =>
             case _ =>
-              errors += TypeError.genError(
+              errors += TypeMismatchError.genError(
                 exprType,
                 Set(IntType()(NULLPOS)),
                 expr.pos,
@@ -198,7 +198,7 @@ object SemanticAnalyser {
           condType match {
             case BoolType() => ()
             case _ =>
-              errors += TypeError.genError(
+              errors += TypeMismatchError.genError(
                 condType,
                 Set(BoolType()(NULLPOS)),
                 cond.pos,
@@ -228,7 +228,7 @@ object SemanticAnalyser {
           condType match {
             case BoolType() => ()
             case _ =>
-              errors += TypeError.genError(
+              errors += TypeMismatchError.genError(
                 condType,
                 Set(BoolType()(NULLPOS)),
                 cond.pos,
@@ -284,7 +284,7 @@ object SemanticAnalyser {
           case Some(ty) =>
             (
               ErrorType()(ident.pos),
-              (errors += TypeError.genError(
+              (errors += TypeMismatchError.genError(
                 ty,
                 Set(ArrayType(AnyType()(NULLPOS))(NULLPOS)),
                 ident.pos,
@@ -305,7 +305,7 @@ object SemanticAnalyser {
           case (ty, lValueErrors) =>
             (
               ErrorType()(l.pos),
-              (errors ++= lValueErrors += TypeError.genError(
+              (errors ++= lValueErrors += TypeMismatchError.genError(
                 ty,
                 Set(PairType(AnyType()(NULLPOS), AnyType()(NULLPOS))(NULLPOS)),
                 l.pos,
@@ -321,7 +321,7 @@ object SemanticAnalyser {
           case (ty, lValueErrors) =>
             (
               ErrorType()(l.pos),
-              (errors ++= lValueErrors += TypeError.genError(
+              (errors ++= lValueErrors += TypeMismatchError.genError(
                 ty,
                 Set(PairType(AnyType()(NULLPOS), AnyType()(NULLPOS))(NULLPOS)),
                 l.pos,
@@ -377,17 +377,21 @@ object SemanticAnalyser {
 
             val (returnType, paramTypes) = funcTable(f)
             if (argTypes.length != paramTypes.length)
-              errors += NoArgs.genError(f, argTypes.length, paramTypes.length)
+              errors += IncorrectNumberOfArgsError.genError(
+                f,
+                argTypes.length,
+                paramTypes.length
+              )
 
             argTypes.zip(paramTypes).zipWithIndex.foreach {
               case ((argType, paramType), i) => {
                 if (!(argType equiv paramType))
-                  errors += TypeError.genError(
+                  errors += TypeMismatchError.genError(
                     argType,
                     Set(paramType),
                     args.toIndexedSeq(i).pos,
-                    s"function call to ${f}"
-                  ) /* NEED TO INFORM THE USER WHICH ARGUMENT'S TYPE MISMATCHES */
+                    s"function call to $f, argument $i: expecting $paramType, got $argType"
+                  )
               }
             }
 
@@ -396,7 +400,7 @@ object SemanticAnalyser {
           case None =>
             (
               ErrorType()(c.pos),
-              (errors += UndefinedFunction.genError(f)).toList
+              (errors += UndefinedFunctionError.genError(f)).toList
             )
         }
 
@@ -464,7 +468,7 @@ object SemanticAnalyser {
             if (xs.length > getArrayTypeRank(t))
               (
                 ErrorType()(ident.pos),
-                (errors += ArrayDimensionMismatch.genError(
+                (errors += ArrayDimensionMismatchError.genError(
                   xs.length,
                   getArrayTypeRank(t),
                   ident.pos
@@ -476,7 +480,7 @@ object SemanticAnalyser {
                 if (!(argType equiv IntType()(NULLPOS)))
                   (
                     ErrorType()(ident.pos),
-                    errors += TypeError.genError(
+                    errors += TypeMismatchError.genError(
                       argType,
                       Set(IntType()(NULLPOS)),
                       xs.toIndexedSeq(i).pos,
@@ -491,7 +495,7 @@ object SemanticAnalyser {
           case Some(ot) =>
             (
               ErrorType()(ident.pos),
-              (errors += TypeError.genError(
+              (errors += TypeMismatchError.genError(
                 ot,
                 Set(ArrayType(AnyType()(NULLPOS))(NULLPOS)),
                 ident.pos,
@@ -586,7 +590,12 @@ object SemanticAnalyser {
     } else {
       (
         ErrorType()(expr.pos),
-        error :+ TypeError.genError(exprType, Set(expectedType), expr.pos, "")
+        error :+ TypeMismatchError.genError(
+          exprType,
+          Set(expectedType),
+          expr.pos,
+          ""
+        )
       )
     }
   }
@@ -608,7 +617,7 @@ object SemanticAnalyser {
     if (!argTypes.exists(expr1Type equiv _)) {
       (
         ErrorType()(expr1.pos),
-        errors :+ TypeError.genError(
+        errors :+ TypeMismatchError.genError(
           expr1Type,
           argTypes,
           expr1.pos,
@@ -618,7 +627,7 @@ object SemanticAnalyser {
     } else if (!argTypes.exists(expr2Type equiv _)) {
       (
         ErrorType()(expr2.pos),
-        errors :+ TypeError.genError(
+        errors :+ TypeMismatchError.genError(
           expr2Type,
           argTypes,
           expr2.pos,
@@ -628,7 +637,12 @@ object SemanticAnalyser {
     } else if (!((expr1Type equiv expr2Type) || (expr2Type equiv expr1Type))) {
       (
         ErrorType()(expr1.pos),
-        errors :+ TypeError.genError(expr1Type, Set(expr2Type), expr2.pos, "")
+        errors :+ TypeMismatchError.genError(
+          expr1Type,
+          Set(expr2Type),
+          expr2.pos,
+          ""
+        )
       )
     } else {
       (retType, errors)

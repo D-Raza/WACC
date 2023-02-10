@@ -8,7 +8,7 @@ import java.io.File
 import parsley.Parsley._
 import parsley.{Parsley, Result}
 import parsley.errors.combinator._
-import parsley.combinator.{some, many, sepBy, sepBy1}
+import parsley.combinator.{some, sepBy, sepBy1}
 import parsley.expr._
 import parsley.io.ParseFromIO
 
@@ -20,32 +20,40 @@ object Parser {
   def parse(input: File): Result[WACCError, Program] =
     `<program>`.parseFromFile(input).get
 
-  // <program> ::= 'begin' <func>* <stat> 'end'
-  private lazy val `<program>` = fully(
-    "begin" *> Program(
-      many(`<func>`),
-      sepBy1(`<stat>`, ";") <* "end"
-    )
-  )
+  private val statsMissingRet = new PartialFunction[List[Stat], Seq[String]] {
 
-  private def missingFuncRet(stats: List[Stat]): Boolean = {
-    stats.last match {
-      case Return(_) | Exit(_) => false
-      case Scope(scopedStats)  => missingFuncRet(scopedStats)
-      case If(_, thenStats, elseStats) =>
-        missingFuncRet(thenStats) || missingFuncRet(elseStats)
-      case While(_, doStats) => missingFuncRet(doStats)
-      case _                 => true
+    private def statsMissingRet(stats: List[Stat]): Boolean = {
+      stats.last match {
+        case Return(_) | Exit(_) => false
+        case Scope(scopedStats)  => statsMissingRet(scopedStats)
+        case If(_, thenStats, elseStats) =>
+          statsMissingRet(thenStats) || statsMissingRet(elseStats)
+        case While(_, doStats) => statsMissingRet(doStats)
+        case _                 => true
+      }
+    }
+
+    override def apply(stats: List[Stat]): Seq[String] = {
+      Seq("function is missing a return on all exit paths")
+    }
+
+    override def isDefinedAt(stats: List[Stat]): Boolean = {
+      statsMissingRet(stats)
     }
   }
+
+  private lazy val `<program>` = fully(
+    "begin" *> (attempt(Program(pure(Nil), sepBy1(`<stat>`, ";"))) <|>
+      Program(some(`<func>`), sepBy1(`<stat>`, ";"))) <* "end"
+  )
 
   // <func> ::= = <type> <ident> ‘(’ <param-list>? ‘)’ ‘is’ <stat> ‘end’
   private lazy val `<func>` = attempt(
     Func(
-      `<type>`,
+      `<type>`.explain("function declaration missing return type"),
       `<ident>`,
       "(" *> `<param-list>` <* ")",
-      "is" *> sepBy1(`<stat>`, ";").filterNot(missingFuncRet) <* "end"
+      "is" *> sepBy1(`<stat>`, ";").guardAgainst(statsMissingRet) <* "end"
     )
   )
 
@@ -68,29 +76,31 @@ object Parser {
                | "while" <expr> "do" <stat> "done"
                | "begin" <stat> "end"
                | <stat> ";" <stat> */
-  private lazy val `<stat>` : Parsley[Stat] = (
-    Skip <# "skip".label("skip")
-      <|> Declare(`<type>`, `<ident>`, "=" *> `<rvalue>`)
-      <|> Assign(`<lvalue>`, "=" *> `<rvalue>`)
-      <|> Read("read" *> `<lvalue>`).label("read")
-      <|> Free("free" *> `<expr>`).label("free")
-      <|> Return("return" *> `<expr>`).label("return")
-      <|> Exit("exit" *> `<expr>`).label("exit")
-      <|> Print("print" *> `<expr>`).label("print")
-      <|> Println("println" *> `<expr>`).label("println")
-      <|> If(
-        "if" *> `<expr>`,
-        "then" *> sepBy1(`<stat>`, ";"),
-        "else" *> sepBy1(`<stat>`, ";") <* "fi"
-      ).label("if statement")
-      <|> While(
-        "while" *> `<expr>`,
-        "do" *> sepBy1(`<stat>`, ";") <* "done".explain("unclosed while loop")
-      ).label("while loop")
-      <|> Scope(
-        "begin" *> sepBy1(`<stat>`, ";") <* "end"
-      )
-  ) // .label("statement")
+  private lazy val `<stat>` : Parsley[Stat] = amend {
+    entrench(
+      Skip <# "skip".label("skip")
+        <|> Declare(`<type>`, `<ident>`, "=".label("declaration") *> `<rvalue>`)
+        <|> Assign(`<lvalue>`, "=".label("assignment") *> `<rvalue>`)
+        <|> Read("read" *> `<lvalue>`).label("read")
+        <|> Free("free" *> `<expr>`).label("free")
+        <|> Return("return" *> `<expr>`).label("return")
+        <|> Exit("exit" *> `<expr>`).label("exit")
+        <|> Print("print" *> `<expr>`).label("print")
+        <|> Println("println" *> `<expr>`).label("println")
+        <|> If(
+          "if" *> `<expr>`,
+          "then" *> sepBy1(`<stat>`, ";"),
+          "else" *> sepBy1(`<stat>`, ";") <* "fi"
+        ).label("if statement")
+        <|> While(
+          "while" *> `<expr>`,
+          "do" *> sepBy1(`<stat>`, ";") <* "done".explain("unclosed while loop")
+        ).label("while loop")
+        <|> Scope(
+          "begin" *> sepBy1(`<stat>`, ";") <* "end"
+        )
+    )
+  }
 
   // <lvalue> ::= <ident> | <array-elem> | <pair-elem>
   private lazy val `<lvalue>` : Parsley[LValue] = (
@@ -195,7 +205,10 @@ object Parser {
 
   // <array-elem> ::= <ident> ('[' <expr> ']')+
   private lazy val `<array-elem>` =
-    ArrayElem(`<ident>`, some("[" *> `<expr>`.label("index") <* "]"))
+    ArrayElem(
+      `<ident>`,
+      some("[".label("index (like `xs[idx]`)") *> `<expr>` <* "]")
+    )
       .label("array element")
 
   // <array-liter> ::= '[' (<expr> (',' <expr>)*)? ']'

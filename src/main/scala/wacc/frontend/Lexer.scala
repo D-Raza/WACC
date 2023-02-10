@@ -10,49 +10,51 @@ import parsley.token.descriptions.{LexicalDesc, NameDesc, SpaceDesc, SymbolDesc}
 import parsley.token.descriptions.numeric.{ExponentDesc, NumericDesc}
 import parsley.token.descriptions.text.{EscapeDesc, TextDesc}
 import parsley.token.predicate
-import parsley.character.isWhitespace
+import parsley.errors.combinator._
 
 object Lexer {
+  final val keywords = Set(
+    "begin",
+    "end",
+    "is",
+    "skip",
+    "read",
+    "free",
+    "return",
+    "exit",
+    "print",
+    "println",
+    "if",
+    "then",
+    "else",
+    "fi",
+    "while",
+    "do",
+    "done",
+    "newpair",
+    "call",
+    "fst",
+    "snd",
+    "int",
+    "bool",
+    "char",
+    "string",
+    "pair",
+    "true",
+    "false",
+    "null",
+    "len",
+    "ord",
+    "chr"
+  )
+
   private val waccDesc = LexicalDesc.plain.copy(
     spaceDesc = SpaceDesc.plain.copy(
       commentLine = "#",
-      space = predicate.Basic(isWhitespace)
+      space = predicate.Basic(_.isWhitespace)
     ),
     symbolDesc = SymbolDesc.plain.copy(
-      hardKeywords = Set(
-        "begin",
-        "end",
-        "is",
-        "skip",
-        "read",
-        "free",
-        "return",
-        "exit",
-        "print",
-        "println",
-        "if",
-        "then",
-        "else",
-        "fi",
-        "while",
-        "do",
-        "done",
-        "newpair",
-        "call",
-        "fst",
-        "snd",
-        "int",
-        "bool",
-        "char",
-        "string",
-        "pair",
-        "true",
-        "false",
-        "null",
-        "len",
-        "ord",
-        "chr"
-      ),
+      hardKeywords = keywords,
       hardOperators = Set(
         "!",
         "-",
@@ -101,9 +103,21 @@ object Lexer {
       )
     )
   )
-  private val lexer = new Lexer(waccDesc)
+  val lexer = new Lexer(waccDesc)
 
-  val VAR_ID: Parsley[String] = lexer.lexeme.names.identifier
+  private def token[A](p: Parsley[A]): Parsley[A] =
+    lexer.lexeme(attempt(p))
+
+  val VAR_ID: Parsley[String] =
+    token {
+      amend {
+        entrench(lexer.lexeme.names.identifier).map(_.mkString).filterOut {
+          case v if keywords(v) =>
+            s"keyword $v may not be used as an identifier"
+        }
+      }
+    }.label("identifier")
+
   val NEGATE: Parsley[Unit] =
     lexer.lexeme(attempt(("-") *> notFollowedBy(digit))).hide
   val INTEGER: Parsley[Int] =
