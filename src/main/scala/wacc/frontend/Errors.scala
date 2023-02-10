@@ -224,7 +224,15 @@ object Errors {
         expected: ExpectedLine,
         reasons: Messages,
         line: LineInfo
-    ): ErrorInfoLines = SyntaxError(unexpected, expected, reasons, line)
+    ): ErrorInfoLines = {
+      val newLineInfo = unexpected match {
+        case Some(unexpected) =>
+          line.copy(errorWidth = unexpected.length)
+        case None => line
+      }
+
+      SyntaxError(unexpected, expected, reasons, newLineInfo)
+    }
 
     override def specialisedError(
         msgs: Messages,

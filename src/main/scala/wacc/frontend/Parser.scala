@@ -18,6 +18,8 @@ object Parser {
   // Utilise our custom error builder
   implicit val waccErrorBuilder: WACCErrorBuilder =
     new WACCErrorBuilder
+    
+    /* <program> ::= "begin" (<func>)* <stat> (";" <stat>)* "end" */
   private lazy val `<program>` = fully(
     "begin" *> (attempt(Program(pure(Nil), sepBy1(`<stat>`, ";"))) <|>
       Program(some(`<func>`), sepBy1(`<stat>`, ";"))) <* "end"
@@ -41,14 +43,11 @@ object Parser {
                | "read" <ident>
                | "free" <ident>
                | "return" <expr>
-               | "exit" <expr>
-
-  // <program> ::= "begin" (<func>)* <stat> (";" <stat>)* "end"
+               | "exit" <expr> 
                | "println" <expr>
                | "if" <expr> "then" <stat> "else" <stat> "fi"
                | "while" <expr> "do" <stat> "done"
-               | "begin" <stat> "end"
-               | <stat> ";" <stat> */
+               | "begin" <stat> "end" */
   private lazy val `<stat>` : Parsley[Stat] = amend {
     entrench(
       Skip <# "skip".label("skip")
