@@ -28,3 +28,6 @@ case class PreIndexedMode(
 
 // Immediate value
 case class ImmVal(value: Int) extends Operand2
+
+// Load immediate value
+case class LoadImmVal(value: Int) extends Operand2
