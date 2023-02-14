@@ -152,7 +152,12 @@ object AST {
 
   sealed trait Type extends WACCType {
     def positioned(pos: (Int, Int)): Type
+    def size: Int = this match {
+      case CharType() | BoolType() => 1
+      case _                       => 4
+    }
     def eraseInnerTypes: PairElemType
+
   }
 
   sealed trait PairElemType extends WACCType {
