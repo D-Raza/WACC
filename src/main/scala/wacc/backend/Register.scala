@@ -3,6 +3,8 @@ package wacc.backend
 sealed trait Register extends Operand2 {
   def n: Int
 }
+
+case object R0 extends Register { def n = 0 }
 case object R1 extends Register { def n = 1 }
 case object R2 extends Register { def n = 2 }
 case object R3 extends Register { def n = 3 }
