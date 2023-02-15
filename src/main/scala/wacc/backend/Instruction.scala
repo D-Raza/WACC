@@ -9,8 +9,8 @@ case class AddInstr(
     destReg: Register,
     operand1: Register,
     operand2: Operand2,
-    cond: Condition,
-    flag: Flag
+    cond: Condition = AL,
+    flag: Option[Flag] = None
 ) extends Instruction
 
 case class SubInstr(
@@ -18,7 +18,7 @@ case class SubInstr(
     operand1: Register,
     operand2: Operand2,
     cond: Condition,
-    flag: Flag
+    flag: Option[Flag] = None
 ) extends Instruction
 
 case class Rsb(
@@ -73,8 +73,11 @@ case class Label(label: String) extends Instruction
 case class Directive(directiveType: String) extends Instruction
 
 // Branch instructions
-case class Branch(label: String, cond: Condition) extends Instruction
-case class BranchAndLink(label: String, cond: Condition) extends Instruction
+case class Branch(label: String, cond: Condition = AL) extends Instruction
+case class BranchAndLink(label: String, cond: Condition = AL)
+    extends Instruction
+case class BranchAndLinkReg(reg: Register, cond: Condition = AL)
+    extends Instruction
 
 // Compare instruction
 case class Cmp(srcReg: Register, opearand: Operand2, cond: Condition)

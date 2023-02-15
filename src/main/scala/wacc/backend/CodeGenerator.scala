@@ -107,11 +107,64 @@ object CodeGenerator {
     )
   }
 
-  def compileStatWithNewScope(statNode: Stat, codeGenState: CodeGeneratorState)(
+  // Compiles function call
+  def compileFunctionCall(funcCallNode: Call, codeGenState: CodeGeneratorState)(
+      implicit instructions: mutable.ListBuffer[Instruction]
+  ): CodeGeneratorState = {
+    var newCodeGenState = codeGenState
+    val argsSize =
+      funcCallNode.args.foldLeft(0)((sum: Int, expr: Expr) => sum + expr.size)
+    val resReg = newCodeGenState.getResReg
+
+    funcCallNode.args.foreach(arg =>
+      newCodeGenState = compileExpression(arg, newCodeGenState)
+    )
+
+    instructions.addAll(
+      List(
+        funcCallNode.x.name match {
+          case "" => {
+            instructions.addAll(
+              List(
+                AddInstr(
+                  resReg,
+                  StackPointer,
+                  ImmVal(
+                    newCodeGenState.stackPointerOffset - newCodeGenState
+                      .getIdentOffset(funcCallNode.x.name)
+                  )
+                ),
+                Load(resReg, RegLoad(resReg))
+              )
+            )
+            BranchAndLinkReg(resReg)
+          }
+          case _ => BranchAndLink("wacc_" + funcCallNode.x.name)
+        },
+        AddInstr(StackPointer, StackPointer, ImmVal(argsSize)),
+        Move(resReg, R0)
+      )
+    )
+
+    val newStackPointerOffset = newCodeGenState.stackPointerOffset - argsSize
+    val newAvailableRegs = newCodeGenState.availableRegs.tail
+    newCodeGenState.copy(
+      availableRegs = newAvailableRegs,
+      stackPointerOffset = newStackPointerOffset
+    )
+  }
+
+  def compileExpression(exprNode: Expr, codeGenState: CodeGeneratorState)(
       implicit instructions: mutable.ListBuffer[Instruction]
   ): CodeGeneratorState = {
     // TODO
     codeGenState
   }
 
+  def compileStatWithNewScope(statNode: Stat, codeGenState: CodeGeneratorState)(
+      implicit instructions: mutable.ListBuffer[Instruction]
+  ): CodeGeneratorState = {
+    // TODO
+    codeGenState
+  }
 }

@@ -130,7 +130,13 @@ object AST {
     val pos: (Int, Int)
   }
 
-  sealed trait Expr extends RValue
+  sealed trait Expr extends RValue {
+    def size: Int = this match {
+      // Needs to consider further cases
+      case CharLiter(_) | BoolLiter(_) => 1
+      case _                           => 4
+    }
+  }
 
 // Types
   sealed trait WACCType {
