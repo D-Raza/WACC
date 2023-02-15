@@ -17,7 +17,7 @@ case class SubInstr(
     destReg: Register,
     operand1: Register,
     operand2: Operand2,
-    cond: Condition,
+    cond: Condition = AL,
     flag: Option[Flag] = None
 ) extends Instruction
 
@@ -41,21 +41,21 @@ case class AndInstr(
     destReg: Register,
     operand1: Register,
     operand2: Operand2,
-    cond: Condition
+    cond: Condition = AL
 ) extends Instruction
 
 case class OrrInstr(
     destReg: Register,
     operand1: Register,
     operand2: Operand2,
-    cond: Condition
+    cond: Condition = AL
 ) extends Instruction
 
 case class EorInstr(
     destReg: Register,
     operand1: Register,
     operand2: Operand2,
-    cond: Condition
+    cond: Condition = AL
 ) extends Instruction
 
 // Data transfer instructions

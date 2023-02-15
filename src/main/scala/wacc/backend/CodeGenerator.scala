@@ -10,6 +10,7 @@ object CodeGenerator {
   ): CodeGeneratorState = {
     var newCodeGenState = codeGenState
 
+    // Compiles each function declaration in the program
     programNode.funcs.foreach(func =>
       newCodeGenState = newCodeGenState.addFunctionName(func.ident.name)
     )
@@ -25,12 +26,14 @@ object CodeGenerator {
       newCodeGenState.stackPointerOffset + 4
     )
 
+    // Compiles each statement in the program
     programNode.stat.foreach(stat =>
       newCodeGenState = compileStatWithNewScope(stat, newCodeGenState)
     )
 
     instructions.addAll(
       List(
+        // Set exit code as 0
         Load(R0, LoadImmVal(0)),
         Pop(ProgramCounter),
         Directive(".ltorg")
@@ -48,9 +51,11 @@ object CodeGenerator {
   ): CodeGeneratorState = {
     var newCodeGenState = codeGenState
 
+    // Compile each of the parameters in the function declaration
     funcNode.paramList.foreach(param =>
       newCodeGenState = compileParam(param, newCodeGenState)
     )
+
     instructions.addAll(
       List(
         Label("wacc_" + funcNode.ident.name),
@@ -61,11 +66,12 @@ object CodeGenerator {
       newCodeGenState.stackPointerOffset + 4
     )
 
-    // Needed for restoring stack pointer after compiling the body of the function
+    // Needed for restoring stack pointer after compiling the body of the function declaration
     val newIdentToOffset =
       newCodeGenState.identToOffset + ("originalSP" -> newCodeGenState.stackPointerOffset)
     newCodeGenState = newCodeGenState.copy(identToOffset = newIdentToOffset)
 
+    // Compile each of the statements in the function declaration's body
     funcNode.stats.foreach(stat =>
       newCodeGenState = compileStatWithNewScope(stat, newCodeGenState)
     )
@@ -116,12 +122,14 @@ object CodeGenerator {
       funcCallNode.args.foldLeft(0)((sum: Int, expr: Expr) => sum + expr.size)
     val resReg = newCodeGenState.getResReg
 
+    // Compile each of the arguments
     funcCallNode.args.foreach(arg =>
       newCodeGenState = compileExpression(arg, newCodeGenState)
     )
 
     instructions.addAll(
       List(
+        // Navigate to function
         funcCallNode.x.name match {
           case "" => {
             instructions.addAll(
@@ -130,6 +138,7 @@ object CodeGenerator {
                   resReg,
                   StackPointer,
                   ImmVal(
+                    // Get where the function's name in the stack is stored relative to the stack pointer
                     newCodeGenState.stackPointerOffset - newCodeGenState
                       .getIdentOffset(funcCallNode.x.name)
                   )
@@ -141,7 +150,9 @@ object CodeGenerator {
           }
           case _ => BranchAndLink("wacc_" + funcCallNode.x.name)
         },
+        // Set the stack pointer back to its original value
         AddInstr(StackPointer, StackPointer, ImmVal(argsSize)),
+        // Move result to result register
         Move(resReg, R0)
       )
     )
@@ -157,8 +168,50 @@ object CodeGenerator {
   def compileExpression(exprNode: Expr, codeGenState: CodeGeneratorState)(
       implicit instructions: mutable.ListBuffer[Instruction]
   ): CodeGeneratorState = {
-    // TODO
-    codeGenState
+    var newCodeGenState = codeGenState
+    val resReg = newCodeGenState.getResReg
+    val operand1Reg = newCodeGenState.getResReg
+
+    exprNode match {
+      // Case for binary expressions
+      case Add(_, _) | Sub(_, _) | And(_, _) | Or(_, _) => {
+        val operand2Reg = newCodeGenState.getNonResReg
+
+        exprNode match {
+          /* Compile the first and second expression in binary expression,
+             and add add the corresponding instruction to instructions list */
+          case Add(x, y) => {
+            newCodeGenState = compileExpression(x, newCodeGenState)
+            newCodeGenState = compileExpression(y, newCodeGenState)
+            instructions += AddInstr(resReg, operand1Reg, operand2Reg)
+          }
+          case And(x, y) => {
+            newCodeGenState = compileExpression(x, newCodeGenState)
+            newCodeGenState = compileExpression(y, newCodeGenState)
+            instructions += AndInstr(resReg, operand1Reg, operand2Reg)
+          }
+          case Or(x, y) => {
+            newCodeGenState = compileExpression(x, newCodeGenState)
+            newCodeGenState = compileExpression(y, newCodeGenState)
+            instructions += OrrInstr(resReg, operand1Reg, operand2Reg)
+          }
+          case Sub(x, y) => {
+            newCodeGenState = compileExpression(x, newCodeGenState)
+            newCodeGenState = compileExpression(y, newCodeGenState)
+            instructions += SubInstr(resReg, operand1Reg, operand2Reg)
+          }
+
+          case _ =>
+        }
+
+        // Register for operand2 is now available for use
+        val newAvailableRegs = newCodeGenState.availableRegs :+ operand2Reg
+        newCodeGenState.copy(availableRegs = newAvailableRegs)
+      }
+      case _ => newCodeGenState
+    }
+
+    newCodeGenState
   }
 
   def compileStatWithNewScope(statNode: Stat, codeGenState: CodeGeneratorState)(
