@@ -80,5 +80,5 @@ case class BranchAndLinkReg(reg: Register, cond: Condition = AL)
     extends Instruction
 
 // Compare instruction
-case class Cmp(srcReg: Register, opearand: Operand2, cond: Condition)
+case class Cmp(srcReg: Register, opearand: Operand2, cond: Condition = AL)
     extends Instruction

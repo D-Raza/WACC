@@ -201,11 +201,83 @@ object CodeGenerator {
             instructions += SubInstr(resReg, operand1Reg, operand2Reg)
           }
 
+          case LT(x, y) => {
+            newCodeGenState = compileExpression(x, newCodeGenState)
+            newCodeGenState = compileExpression(y, newCodeGenState)
+            instructions.addAll(
+              List(
+                Cmp(operand1Reg, operand2Reg),
+                Move(resReg, ImmVal(1), Condition.LT),
+                Move(resReg, ImmVal(0), Condition.GE)
+              )
+            )
+          }
+
+          case LTE(x, y) => {
+            newCodeGenState = compileExpression(x, newCodeGenState)
+            newCodeGenState = compileExpression(y, newCodeGenState)
+            instructions.addAll(
+              List(
+                Cmp(operand1Reg, operand2Reg),
+                Move(resReg, ImmVal(1), Condition.LE),
+                Move(resReg, ImmVal(0), Condition.GT)
+              )
+            )
+          }
+
+          case GT(x, y) => {
+            newCodeGenState = compileExpression(x, newCodeGenState)
+            newCodeGenState = compileExpression(y, newCodeGenState)
+            instructions.addAll(
+              List(
+                Cmp(operand1Reg, operand2Reg),
+                Move(resReg, ImmVal(1), Condition.GT),
+                Move(resReg, ImmVal(0), Condition.LE)
+              )
+            )
+          }
+
+          case GTE(x, y) => {
+            newCodeGenState = compileExpression(x, newCodeGenState)
+            newCodeGenState = compileExpression(y, newCodeGenState)
+            instructions.addAll(
+              List(
+                Cmp(operand1Reg, operand2Reg),
+                Move(resReg, ImmVal(1), Condition.GE),
+                Move(resReg, ImmVal(0), Condition.LT)
+              )
+            )
+          }
+
+          case NotEqual(x, y) => {
+            newCodeGenState = compileExpression(x, newCodeGenState)
+            newCodeGenState = compileExpression(y, newCodeGenState)
+            instructions.addAll(
+              List(
+                Cmp(operand1Reg, operand2Reg),
+                Move(resReg, ImmVal(1), Condition.NE),
+                Move(resReg, ImmVal(0), Condition.EQ)
+              )
+            )
+          }
+
+          case Equal(x, y) => {
+            newCodeGenState = compileExpression(x, newCodeGenState)
+            newCodeGenState = compileExpression(y, newCodeGenState)
+            instructions.addAll(
+              List(
+                Cmp(operand1Reg, operand2Reg),
+                Move(resReg, ImmVal(1), Condition.EQ),
+                Move(resReg, ImmVal(0), Condition.NE)
+              )
+            )
+          }
+
           case _ =>
         }
 
         // Register for operand2 is now available for use
-        val newAvailableRegs = newCodeGenState.availableRegs :+ operand2Reg
+        val newAvailableRegs = operand2Reg +: newCodeGenState.availableRegs
         newCodeGenState.copy(availableRegs = newAvailableRegs)
       }
       case _ => newCodeGenState
