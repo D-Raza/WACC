@@ -174,12 +174,13 @@ object CodeGenerator {
 
     exprNode match {
       // Case for binary expressions
-      case Add(_, _) | Sub(_, _) | And(_, _) | Or(_, _) => {
+      case Add(_, _) | Sub(_, _) | And(_, _) | Or(_, _) | LT(_, _) | LTE(_, _) |
+          GT(_, _) | GTE(_, _) | Equal(_, _) | NotEqual(_, _) => {
         val operand2Reg = newCodeGenState.getNonResReg
 
+        /* Compile the first and second expression in the binary expression,
+           and add the corresponding instructions needed to instructions list */
         exprNode match {
-          /* Compile the first and second expression in binary expression,
-             and add add the corresponding instruction to instructions list */
           case Add(x, y) => {
             newCodeGenState = compileExpression(x, newCodeGenState)
             newCodeGenState = compileExpression(y, newCodeGenState)
@@ -280,6 +281,31 @@ object CodeGenerator {
         val newAvailableRegs = operand2Reg +: newCodeGenState.availableRegs
         newCodeGenState.copy(availableRegs = newAvailableRegs)
       }
+
+      // Case for unary expressions
+      case Not(_) | Neg(_) | Len(_) | Ord(_) | Chr(_) => {
+        /* Compile the first expression in the unary expression,
+         and add add the corresponding instructions needed to instructions list */
+        exprNode match {
+          case Not(x) => {
+            newCodeGenState = compileExpression(x, newCodeGenState)
+            instructions += XorInstr(resReg, resReg, ImmVal(1))
+          }
+          case Neg(x) => {
+            newCodeGenState = compileExpression(x, newCodeGenState)
+            instructions += Rsb(resReg, resReg, ImmVal(0))
+          }
+          case Len(x) => {
+            newCodeGenState = compileExpression(x, newCodeGenState)
+            instructions += Load(resReg, RegLoad(resReg))
+          }
+          case Ord(x) => newCodeGenState = compileExpression(x, newCodeGenState)
+          case Chr(x) => newCodeGenState = compileExpression(x, newCodeGenState)
+        }
+
+        newCodeGenState
+      }
+
       case _ => newCodeGenState
     }
 

@@ -25,7 +25,7 @@ case class Rsb(
     destReg: Register,
     operand1: Register,
     operand2: Operand2,
-    cond: Condition
+    cond: Condition = AL
 ) extends Instruction
 
 case class SMull(
@@ -33,7 +33,7 @@ case class SMull(
     rdHi: Register,
     rn: Register,
     rm: Register,
-    cond: Condition
+    cond: Condition = AL
 ) extends Instruction
 
 // Logical instructions
@@ -52,6 +52,13 @@ case class OrrInstr(
 ) extends Instruction
 
 case class EorInstr(
+    destReg: Register,
+    operand1: Register,
+    operand2: Operand2,
+    cond: Condition = AL
+) extends Instruction
+
+case class XorInstr(
     destReg: Register,
     operand1: Register,
     operand2: Operand2,
