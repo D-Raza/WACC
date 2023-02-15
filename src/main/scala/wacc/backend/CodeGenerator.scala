@@ -143,7 +143,7 @@ object CodeGenerator {
                       .getIdentOffset(funcCallNode.x.name)
                   )
                 ),
-                Load(resReg, RegLoad(resReg))
+                Load(resReg, OffsetMode(resReg))
               )
             )
             BranchAndLinkReg(resReg)
@@ -297,7 +297,7 @@ object CodeGenerator {
           }
           case Len(x) => {
             newCodeGenState = compileExpression(x, newCodeGenState)
-            instructions += Load(resReg, RegLoad(resReg))
+            instructions += Load(resReg, OffsetMode(resReg))
           }
           case Ord(x) => newCodeGenState = compileExpression(x, newCodeGenState)
           case Chr(x) => newCodeGenState = compileExpression(x, newCodeGenState)
