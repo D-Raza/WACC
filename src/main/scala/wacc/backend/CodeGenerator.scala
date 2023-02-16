@@ -358,8 +358,21 @@ object CodeGenerator {
       // TODO
       case Return(_) =>
       // TODO
-      case Exit(_) =>
-      // TODO
+
+      case Exit(expr) =>
+        val resReg = newCodeGenState.getResReg
+        newCodeGenState = compileExpression(expr, newCodeGenState)
+
+        instructions.addAll(
+          List(
+            Move(R0, resReg),
+            BranchAndLink("exit")
+          )
+        )
+
+        val newAvailableRegs = resReg +: newCodeGenState.availableRegs
+        newCodeGenState = newCodeGenState.copy(availableRegs = newAvailableRegs)
+
       case Print(_) =>
       // TODO
       case Println(_) =>
