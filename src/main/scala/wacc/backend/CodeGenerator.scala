@@ -175,13 +175,23 @@ object CodeGenerator {
 
     exprNode match {
       // Case for binary expressions
-      case Add(_, _) | Sub(_, _) | And(_, _) | Or(_, _) | LT(_, _) | LTE(_, _) |
-          GT(_, _) | GTE(_, _) | Equal(_, _) | NotEqual(_, _) => {
+      case Add(_, _) | Sub(_, _) | Mult(_, _) | Div(_, _) | Mod(_, _) |
+          And(_, _) | Or(_, _) | LT(_, _) | LTE(_, _) | GT(_, _) | GTE(_, _) |
+          Equal(_, _) | NotEqual(_, _) => {
         val operand2Reg = newCodeGenState.getNonResReg
 
         /* Compile the first and second expression in the binary expression,
            and add the corresponding instructions needed to instructions list */
         exprNode match {
+          case Mult(x, y) =>
+          // TODO
+
+          case Div(x, y) =>
+          // TODO
+
+          case Mod(x, y) =>
+          // TODO
+
           case Add(x, y) =>
             newCodeGenState = compileExpression(x, newCodeGenState)
             newCodeGenState = compileExpression(y, newCodeGenState)
@@ -267,8 +277,6 @@ object CodeGenerator {
                 Move(resReg, ImmVal(0), Condition.NE)
               )
             )
-
-          case _ =>
         }
 
         // Register for operand2 is now available for use
@@ -325,8 +333,6 @@ object CodeGenerator {
           newCodeGenState.availableRegs.tail
         )
       }
-
-      case _ => newCodeGenState
     }
 
     newCodeGenState
