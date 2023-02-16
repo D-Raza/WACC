@@ -165,6 +165,7 @@ object CodeGenerator {
     )
   }
 
+  // Compiles expression
   def compileExpression(exprNode: Expr, codeGenState: CodeGeneratorState)(
       implicit instructions: mutable.ListBuffer[Instruction]
   ): CodeGeneratorState = {
@@ -327,6 +328,50 @@ object CodeGenerator {
 
       case _ => newCodeGenState
     }
+
+    newCodeGenState
+  }
+
+  // Compiles 'if-then-else' statements
+  def compileIfStat(ifNode: If, codeGenState: CodeGeneratorState)(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): CodeGeneratorState = {
+    val condReg = codeGenState.getResReg
+
+    // Compile condition
+    var newCodeGenState = compileExpression(ifNode.cond, codeGenState)
+
+    val elseLabelId = newCodeGenState.getNewLabelId
+    val endLabelId = newCodeGenState.getNewLabelId
+
+    instructions.addAll(
+      List(
+        Cmp(condReg, ImmVal(0)),
+        Branch("l_" + elseLabelId, Condition.EQ)
+      )
+    )
+
+    val newAvailableRegs = condReg +: newCodeGenState.availableRegs
+    newCodeGenState = newCodeGenState.copy(availableRegs = newAvailableRegs)
+
+    // Compile then statement
+    ifNode.thenStat.foreach(stat =>
+      newCodeGenState = compileStatWithNewScope(stat, newCodeGenState)
+    )
+
+    instructions.addAll(
+      List(
+        Branch("l_" + endLabelId),
+        Label(elseLabelId.toString())
+      )
+    )
+
+    // Compile else statement
+    ifNode.elseStat.foreach(stat =>
+      newCodeGenState = compileStatWithNewScope(stat, newCodeGenState)
+    )
+
+    instructions += Label(endLabelId.toString())
 
     newCodeGenState
   }
