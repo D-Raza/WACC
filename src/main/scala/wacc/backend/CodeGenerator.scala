@@ -344,23 +344,47 @@ object CodeGenerator {
     var newCodeGenState = codeGenState
 
     statNode match {
-      case ifStatNode @ If(_, _, _) =>
-        newCodeGenState = compileIfStat(ifStatNode, newCodeGenState)
       case Skip() =>
         newCodeGenState
+
       case Assign(_, _) =>
       // TODO
-      case Declare(_, _, _) =>
-      // TODO
+
+      case Declare(ty, x, y) =>
+        val resReg = newCodeGenState.getResReg
+
+        newCodeGenState = compileRValue(y, newCodeGenState)
+
+        instructions.addAll(
+          List(
+            SubInstr(StackPointer, StackPointer, ImmVal(ty.size)),
+            Store(resReg, OffsetMode(StackPointer))
+          )
+        )
+
+        val newStackPointerOffset = newCodeGenState.stackPointerOffset + ty.size
+        newCodeGenState = newCodeGenState.copy(
+          usedStackSize = newCodeGenState.usedStackSize + ty.size,
+          identToOffset =
+            newCodeGenState.identToOffset + (x.name -> newStackPointerOffset),
+          stackPointerOffset = newStackPointerOffset
+        )
+
+        val newAvailableRegs = resReg +: newCodeGenState.availableRegs
+        newCodeGenState = newCodeGenState.copy(availableRegs = newAvailableRegs)
+
       case Read(_) =>
       // TODO
+
       case Free(_) =>
       // TODO
+
       case Return(_) =>
       // TODO
 
       case Exit(expr) =>
         val resReg = newCodeGenState.getResReg
+
         newCodeGenState = compileExpression(expr, newCodeGenState)
 
         instructions.addAll(
@@ -375,10 +399,16 @@ object CodeGenerator {
 
       case Print(_) =>
       // TODO
+
       case Println(_) =>
       // TODO
+
+      case ifStatNode @ If(_, _, _) =>
+        newCodeGenState = compileIfStat(ifStatNode, newCodeGenState)
+
       case While(_, _) =>
       // TODO
+
       case Scope(_) =>
       // TODO
     }
@@ -428,6 +458,13 @@ object CodeGenerator {
     instructions += Label(endLabelId.toString())
 
     newCodeGenState
+  }
+
+  def compileRValue(rValueNode: RValue, codeGenState: CodeGeneratorState)(
+      implicit instructions: mutable.ListBuffer[Instruction]
+  ): CodeGeneratorState = {
+    // TODO
+    codeGenState
   }
 
   def compileStatWithNewScope(statNode: Stat, codeGenState: CodeGeneratorState)(
