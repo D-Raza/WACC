@@ -332,6 +332,41 @@ object CodeGenerator {
     newCodeGenState
   }
 
+  def compileStat(statNode: Stat, codeGenState: CodeGeneratorState)(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): CodeGeneratorState = {
+    var newCodeGenState = codeGenState
+
+    statNode match {
+      case ifStatNode @ If(_, _, _) =>
+        newCodeGenState = compileIfStat(ifStatNode, newCodeGenState)
+      case Skip() =>
+        newCodeGenState
+      case Assign(_, _) =>
+      // TODO
+      case Declare(_, _, _) =>
+      // TODO
+      case Read(_) =>
+      // TODO
+      case Free(_) =>
+      // TODO
+      case Return(_) =>
+      // TODO
+      case Exit(_) =>
+      // TODO
+      case Print(_) =>
+      // TODO
+      case Println(_) =>
+      // TODO
+      case While(_, _) =>
+      // TODO
+      case Scope(_) =>
+      // TODO
+    }
+
+    newCodeGenState
+  }
+
   // Compiles 'if-then-else' statements
   def compileIfStat(ifNode: If, codeGenState: CodeGeneratorState)(implicit
       instructions: mutable.ListBuffer[Instruction]
