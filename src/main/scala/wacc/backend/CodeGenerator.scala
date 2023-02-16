@@ -181,28 +181,27 @@ object CodeGenerator {
         /* Compile the first and second expression in the binary expression,
            and add the corresponding instructions needed to instructions list */
         exprNode match {
-          case Add(x, y) => {
+          case Add(x, y) =>
             newCodeGenState = compileExpression(x, newCodeGenState)
             newCodeGenState = compileExpression(y, newCodeGenState)
             instructions += AddInstr(resReg, operand1Reg, operand2Reg)
-          }
-          case And(x, y) => {
+
+          case And(x, y) =>
             newCodeGenState = compileExpression(x, newCodeGenState)
             newCodeGenState = compileExpression(y, newCodeGenState)
             instructions += AndInstr(resReg, operand1Reg, operand2Reg)
-          }
-          case Or(x, y) => {
+
+          case Or(x, y) =>
             newCodeGenState = compileExpression(x, newCodeGenState)
             newCodeGenState = compileExpression(y, newCodeGenState)
             instructions += OrrInstr(resReg, operand1Reg, operand2Reg)
-          }
-          case Sub(x, y) => {
+
+          case Sub(x, y) =>
             newCodeGenState = compileExpression(x, newCodeGenState)
             newCodeGenState = compileExpression(y, newCodeGenState)
             instructions += SubInstr(resReg, operand1Reg, operand2Reg)
-          }
 
-          case LT(x, y) => {
+          case LT(x, y) =>
             newCodeGenState = compileExpression(x, newCodeGenState)
             newCodeGenState = compileExpression(y, newCodeGenState)
             instructions.addAll(
@@ -212,9 +211,8 @@ object CodeGenerator {
                 Move(resReg, ImmVal(0), Condition.GE)
               )
             )
-          }
 
-          case LTE(x, y) => {
+          case LTE(x, y) =>
             newCodeGenState = compileExpression(x, newCodeGenState)
             newCodeGenState = compileExpression(y, newCodeGenState)
             instructions.addAll(
@@ -224,9 +222,8 @@ object CodeGenerator {
                 Move(resReg, ImmVal(0), Condition.GT)
               )
             )
-          }
 
-          case GT(x, y) => {
+          case GT(x, y) =>
             newCodeGenState = compileExpression(x, newCodeGenState)
             newCodeGenState = compileExpression(y, newCodeGenState)
             instructions.addAll(
@@ -236,9 +233,8 @@ object CodeGenerator {
                 Move(resReg, ImmVal(0), Condition.LE)
               )
             )
-          }
 
-          case GTE(x, y) => {
+          case GTE(x, y) =>
             newCodeGenState = compileExpression(x, newCodeGenState)
             newCodeGenState = compileExpression(y, newCodeGenState)
             instructions.addAll(
@@ -248,9 +244,8 @@ object CodeGenerator {
                 Move(resReg, ImmVal(0), Condition.LT)
               )
             )
-          }
 
-          case NotEqual(x, y) => {
+          case NotEqual(x, y) =>
             newCodeGenState = compileExpression(x, newCodeGenState)
             newCodeGenState = compileExpression(y, newCodeGenState)
             instructions.addAll(
@@ -260,9 +255,8 @@ object CodeGenerator {
                 Move(resReg, ImmVal(0), Condition.EQ)
               )
             )
-          }
 
-          case Equal(x, y) => {
+          case Equal(x, y) =>
             newCodeGenState = compileExpression(x, newCodeGenState)
             newCodeGenState = compileExpression(y, newCodeGenState)
             instructions.addAll(
@@ -272,14 +266,13 @@ object CodeGenerator {
                 Move(resReg, ImmVal(0), Condition.NE)
               )
             )
-          }
 
           case _ =>
         }
 
         // Register for operand2 is now available for use
         val newAvailableRegs = operand2Reg +: newCodeGenState.availableRegs
-        newCodeGenState.copy(availableRegs = newAvailableRegs)
+        newCodeGenState = newCodeGenState.copy(availableRegs = newAvailableRegs)
       }
 
       // Case for unary expressions
@@ -287,23 +280,49 @@ object CodeGenerator {
         /* Compile the first expression in the unary expression,
          and add add the corresponding instructions needed to instructions list */
         exprNode match {
-          case Not(x) => {
+          case Not(x) =>
             newCodeGenState = compileExpression(x, newCodeGenState)
             instructions += XorInstr(resReg, resReg, ImmVal(1))
-          }
-          case Neg(x) => {
+
+          case Neg(x) =>
             newCodeGenState = compileExpression(x, newCodeGenState)
             instructions += Rsb(resReg, resReg, ImmVal(0))
-          }
-          case Len(x) => {
+
+          case Len(x) =>
             newCodeGenState = compileExpression(x, newCodeGenState)
             instructions += Load(resReg, OffsetMode(resReg))
-          }
-          case Ord(x) => newCodeGenState = compileExpression(x, newCodeGenState)
-          case Chr(x) => newCodeGenState = compileExpression(x, newCodeGenState)
+
+          case Ord(x) =>
+            newCodeGenState = compileExpression(x, newCodeGenState)
+
+          case Chr(x) =>
+            newCodeGenState = compileExpression(x, newCodeGenState)
+        }
+      }
+
+      // Case for expression literals
+      case IntegerLiter(_) | BoolLiter(_) | CharLiter(_) | StrLiter(_) |
+          Null() => {
+        exprNode match {
+          case IntegerLiter(x) =>
+            instructions += Load(resReg, LoadImmVal(x))
+
+          case BoolLiter(x) =>
+            instructions += Move(resReg, ImmVal(if (x) 1 else 0))
+
+          case CharLiter(x) =>
+            instructions += Move(resReg, ImmChar(x))
+
+          case StrLiter(x) =>
+          // TODO
+
+          case Null() =>
+            instructions += Load(resReg, LoadImmVal(0))
         }
 
-        newCodeGenState
+        newCodeGenState = newCodeGenState.copy(availableRegs =
+          newCodeGenState.availableRegs.tail
+        )
       }
 
       case _ => newCodeGenState
