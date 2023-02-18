@@ -379,8 +379,31 @@ object CodeGenerator {
       case Free(_) =>
       // TODO
 
-      case Return(_) =>
-      // TODO
+      case Return(expr) =>
+        val resReg = newCodeGenState.getResReg
+        newCodeGenState = compileExpression(expr, newCodeGenState)
+
+        instructions.addAll(
+          List(
+            Move(R0, resReg),
+            AddInstr(
+              StackPointer,
+              StackPointer,
+              ImmVal(
+                newCodeGenState.stackPointerOffset - newCodeGenState
+                  .getIdentOffset("originalSP")
+              )
+            ),
+            Pop(ProgramCounter)
+          )
+        )
+
+        val newAvailableRegs = resReg +: newCodeGenState.availableRegs
+        val newStackPointerOffset = newCodeGenState.getIdentOffset("originalSP")
+        newCodeGenState = newCodeGenState.copy(
+          availableRegs = newAvailableRegs,
+          stackPointerOffset = newStackPointerOffset
+        )
 
       case Exit(expr) =>
         val resReg = newCodeGenState.getResReg
