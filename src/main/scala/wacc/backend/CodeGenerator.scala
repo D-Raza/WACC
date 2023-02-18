@@ -486,8 +486,28 @@ object CodeGenerator {
   def compileRValue(rValueNode: RValue, codeGenState: CodeGeneratorState)(
       implicit instructions: mutable.ListBuffer[Instruction]
   ): CodeGeneratorState = {
-    // TODO
-    codeGenState
+    var newCodeGenState = codeGenState
+
+    rValueNode match {
+      case ArrayLit(xs) =>
+      // TODO
+
+      case NewPair(fst, snd) =>
+      // TODO
+
+      case Call(_, _) =>
+        newCodeGenState =
+          compileFunctionCall(rValueNode.asInstanceOf[Call], newCodeGenState)
+
+      case _: Expr =>
+        newCodeGenState =
+          compileExpression(rValueNode.asInstanceOf[Expr], newCodeGenState)
+
+      case _: PairElem =>
+      // TODO
+    }
+
+    newCodeGenState
   }
 
   def compileStatWithNewScope(statNode: Stat, codeGenState: CodeGeneratorState)(
