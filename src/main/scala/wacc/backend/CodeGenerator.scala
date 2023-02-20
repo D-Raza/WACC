@@ -1,6 +1,7 @@
 package wacc.backend
 
 import wacc.AST._
+import wacc.backend.Globals.{PAIR_SIZE, WORD_SIZE}
 import scala.collection.mutable
 
 object CodeGenerator {
@@ -347,8 +348,12 @@ object CodeGenerator {
       case Skip() =>
         newCodeGenState
 
-      case Assign(_, _) =>
-      // TODO
+      case Assign(lValue, rValue) => {
+        newCodeGenState = compileRValue(rValue, newCodeGenState)
+        // newCodeGenState = compileLValue(lValue, newCodeGenState)
+        // TODO
+      }
+
 
       case Declare(ty, x, y) =>
         val resReg = newCodeGenState.getResReg
@@ -429,11 +434,30 @@ object CodeGenerator {
       case ifStatNode @ If(_, _, _) =>
         newCodeGenState = compileIfStat(ifStatNode, newCodeGenState)
 
-      case While(_, _) =>
-      // TODO
+      case While(cond, doStat) =>
+        // TODO: Implement unique while loop namer
+        val uniqueWhileName = "unique_name!" // placeholder
+        val startLabel = uniqueWhileName + "_start"
+        val endLabel = uniqueWhileName + "_end"
+        instructions.addAll(
+          List(
+          Label(startLabel),
+          ))
+        newCodeGenState = compileExpression(cond, newCodeGenState)
+        instructions.addAll(List(
+          Cmp(R1, ImmVal(0)),
+          Branch(endLabel, Condition.EQ)
+        ))
+        doStat.foreach(stat =>
+          newCodeGenState = compileStatWithNewScope(stat, newCodeGenState))
+        instructions.addAll(List(
+          Branch(startLabel),
+          Label(endLabel)
+        ))
 
-      case Scope(_) =>
-      // TODO
+
+      case Scope(stats) =>
+        stats.foreach(stat => newCodeGenState = compileStatWithNewScope(stat, newCodeGenState))
     }
 
     newCodeGenState
@@ -490,22 +514,38 @@ object CodeGenerator {
 
     rValueNode match {
       case ArrayLit(xs) =>
-      // TODO
+        newCodeGenState =
+          compileExpression(rValueNode.asInstanceOf[Expr], newCodeGenState)
 
       case NewPair(fst, snd) =>
-      // TODO
+        newCodeGenState = 
+          compileNewPair(fst, snd, newCodeGenState)
 
       case Call(_, _) =>
         newCodeGenState =
           compileFunctionCall(rValueNode.asInstanceOf[Call], newCodeGenState)
 
-      case _: Expr =>
+      case expr: Expr =>
         newCodeGenState =
-          compileExpression(rValueNode.asInstanceOf[Expr], newCodeGenState)
+          compileExpression(expr, newCodeGenState)
 
       case _: PairElem =>
       // TODO
     }
+
+    newCodeGenState
+  }
+
+  def compileNewPair(fst: Expr, snd: Expr, codeGenState: CodeGeneratorState)(
+    implicit instructions: mutable.ListBuffer[Instruction]
+  ): CodeGeneratorState = {
+    var newCodeGenState = codeGenState
+    newCodeGenState = compileExpression(fst, newCodeGenState)
+    // need to add size of fst and snd somehow
+    newCodeGenState = compileExpression(snd, newCodeGenState)
+
+    instructions ++ mutable.ListBuffer(Load(R0, LoadImmVal(PAIR_SIZE)), BranchAndLink("malloc"), 
+    Pop(R2), Pop(R1), Store(R1, OffsetMode(R0)), Store(R2, OffsetMode(R0, shiftAmount = ImmVal(WORD_SIZE))))
 
     newCodeGenState
   }

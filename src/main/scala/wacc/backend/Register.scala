@@ -4,6 +4,13 @@ sealed trait Register extends Operand2 {
   def n: Int
 }
 
+object Globals {
+  val BYTE_SIZE = 1
+  val CHAR_SIZE = 1
+  val WORD_SIZE = 4
+  val PAIR_SIZE = 8
+}
+
 case object R0 extends Register { def n = 0 }
 case object R1 extends Register { def n = 1 }
 case object R2 extends Register { def n = 2 }
