@@ -4,11 +4,23 @@ import parsley.{Failure, Success}
 import wacc.frontend.Parser._
 import wacc.frontend.SemanticAnalyser._
 
-import java.io.File
+import java.io.{File, PrintWriter}
 import scala.io.Source
 
 object Compiler {
   val DEBUG = false
+
+  val DUMMY_ASM = """|.data
+                     |.text
+                     |.global main
+                     |main:
+                     |    push {fp, lr}
+                     |    push {r8, r10, r12}
+                     |    mov fp, sp
+                     |    mov r0, #0
+                     |    pop {r8, r10, r12}
+                     |    pop {fp, pc}
+                """.stripMargin
 
   def main(args: Array[String]): Unit = {
     // Argument checking
@@ -52,6 +64,14 @@ object Compiler {
         val errors = checkProgramSemantics(x)
         if (errors.isEmpty) {
           println("No errors found!")
+
+          println("Assembling...")
+          val printWriter = new PrintWriter(
+            inputFile.getName.split('.').head + ".s"
+          )
+          printWriter.write(DUMMY_ASM)
+          printWriter.write("\n")
+          printWriter.close()
         } else {
           println("Errors found:")
           errors.foreach(println)
@@ -60,9 +80,6 @@ object Compiler {
       }
       case Failure(msg) => { println(msg); exitCode = 100 }
     }
-
-    // TODO: Backend
-    // println("Assembling...")
 
     println("Exit code: " + exitCode)
     System.exit(exitCode)

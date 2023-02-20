@@ -1,6 +1,7 @@
 #!/bin/bash
 
 LOGFILE="test.log"
+EXECDIR="test_exec"
 NO_THREADS=4
 
 # Usage message
@@ -18,6 +19,10 @@ else
   git reset --hard HEAD --quiet
   git pull --quiet
   cd ..
+fi
+
+if [ ! -d $EXECDIR ]; then
+    mkdir $EXECDIR
 fi
 
 shopt -s extglob
@@ -40,30 +45,94 @@ echo -e "\e[1;35mRunning $no_files tests in $dir\e[0m" | tee -a >(sed -r 's/\x1B
 
 # Test a file
 test_task() {
-    exec 4<&1 5<&2 1>&2>&>(tee >(sed -r 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[m|K]//g' > $1.tmpresult))
+    file=$1
+    exec 4<&1 5<&2 1>&2>&>(tee >(sed -r 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[m|K]//g' > $file.tmpresult))
 
-    expected_exit_code=0
-    if grep -q '# Exit:' $1; then 
-        expected_exit_code=$(awk '/# Exit:/{getline; print}' $1 | grep -o '[0-9]\+')
-    fi 
+    expected_runtime_exit_code=0
+    if grep -q '# Exit:' $file; then 
+        expected_runtime_exit_code=$(awk '/# Exit:/{getline; print}' $file | grep -o '[0-9]\+')
+    fi
+
+    expected_output=""
+    if grep -q '# Output:' $file; then 
+        expected_output=$(awk '/^# Output/{getline; p=1} p && /^#/ {print substr($0, 3); next} /^$/ {p=0}' $file | awk 'NR>1{print PREV} {PREV=$0} END{printf("%s",$0)}'; r=$?; echo /; exit "$r")
+        expected_output=${expected_output%/}
+    fi
     
     # Account for invalid exit codes
-    if [ "$expected_exit_code" -ne 100 ] && [ "$expected_exit_code" -ne 200 ]; then
-        expected_exit_code=0
-    fi
-
-    output=$(./compile "$1")
-    result_exit_code=$?
-
-    if [ $expected_exit_code -eq $result_exit_code ]; then
-        echo -e "\e[1;32m[PASS]\e[0m \e[32m$file\e[0m"
+    if [ "$expected_runtime_exit_code" -ne 100 ] && [ "$expected_runtime_exit_code" -ne 200 ]; then
+        expected_compiler_exit_code=0
     else
-        echo -e "\e[1;31m[FAIL]\e[0m \e[31m$file\t expected: $expected_exit_code but got: $result_exit_code\e[0m"
+        expected_compiler_exit_code=$expected_runtime_exit_code
+    fi
+    
+    compiler_output=$(./compile "$file")
+    compiler_exit_code=$?
+
+    if [ $expected_compiler_exit_code -eq $compiler_exit_code ]; then
+        if [ $compiler_exit_code -eq 0 ]; then
+            sleep 0.1
+            filename=$(basename -- "$file")
+            filename="${filename%.*}"
+            outfile="$filename.s"
+
+            if [ -f "$outfile" ]; then
+                assembler_output=$(arm-linux-gnueabi-gcc -o "$EXECDIR/$filename" -mcpu=arm1176jzf-s -mtune=arm1176jzf-s "$filename.s" 2>&1)
+                assembler_exit_code=$?
+                if [ $assembler_exit_code -eq 0 ]; then
+                    emulator_output=$(qemu-arm -L /usr/arm-linux-gnueabi/ "$EXECDIR/$filename"; r=$?; echo /; exit "$r")
+                    emulator_exit_code=$?
+                    emulator_output=${emulator_output%/}
+                    if [ $emulator_exit_code -eq $expected_runtime_exit_code ]; then
+                        if [ ! -z "$expected_output" ]; then
+                            output_diff=$(diff <(echo "$emulator_output") <(echo "$expected_output"))
+                            if [ -z "$output_diff" ]; then
+                                test_result="\e[1;32m[PASS]\e[0m \e[32m$file\e[0m"
+                            else
+                                test_result="\e[1;31m[FAIL]\e[0m \e[31m$file\t BACKEND - incorrect output at runtime\e[0m"
+                            fi
+                        else
+                            test_result="\e[1;32m[PASS]\e[0m \e[32m$file\e[0m"
+                        fi
+                    else
+                        test_result="\e[1;31m[FAIL]\e[0m \e[31m$file\t BACKEND - expected: $expected_runtime_exit_code but got: $emulator_exit_code\e[0m"
+                    fi
+                else
+                    test_result="\e[1;31m[FAIL]\e[0m \e[31m$file\t BACKEND - assembly of $outfile unsuccessful\e[0m"
+                fi
+            else
+                test_result="\e[1;31m[FAIL]\e[0m \e[31m$file\t BACKEND - $outfile not found\e[0m"
+            fi
+        else
+            test_result="\e[1;32m[PASS]\e[0m \e[32m$file\e[0m"
+        fi
+    else
+        test_result="\e[1;31m[FAIL]\e[0m \e[31m$file\t FRONTEND - expected: $expected_compiler_exit_code but got: $compiler_exit_code\e[0m"
     fi
 
-    echo "$output"
-    echo
+    echo -e "$test_result"
 
+    if [ $compiler_exit_code -ne 0 ]; then
+        echo -e "\e[34m--- Compiler Output ---\e[0m"
+        echo "$compiler_output"
+        echo
+    fi
+
+    if [ $assembler_exit_code -ne 0 ]; then
+        echo -e "\e[34m--- Assembler Output ---\e[0m"
+        echo "$assembler_output"
+        echo
+    fi
+
+    # if [ "$emulator_output" != "$expected_output" ]; then
+    if [ ! -z "$emulator_output" ]; then
+        echo -e "\e[34m--- Emulator Output Difference ---\e[0m"
+        echo "$emulator_output"
+        echo "$output_diff"
+    fi
+    
+    echo
+  
     exit 0
 }
 
@@ -83,7 +152,7 @@ do
   res_file=$file.tmpresult
   if grep -q '\[FAIL\]' $res_file; then
     no_errors=$((++no_errors))
-    echo -e "\e[1;31m[FAIL]\e[0m \e[31m$(basename $file)\e[0m"
+    echo -e "\e[1;31m[FAIL]\e[0m \e[31m$file\e[0m"
   fi
   cat $res_file | tee -a $LOGFILE >> /dev/null
   rm $res_file
