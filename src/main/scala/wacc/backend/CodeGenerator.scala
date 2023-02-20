@@ -354,7 +354,6 @@ object CodeGenerator {
         // TODO
       }
 
-
       case Declare(ty, x, y) =>
         val resReg = newCodeGenState.getResReg
 
@@ -441,23 +440,30 @@ object CodeGenerator {
         val endLabel = uniqueWhileName + "_end"
         instructions.addAll(
           List(
-          Label(startLabel),
-          ))
+            Label(startLabel)
+          )
+        )
         newCodeGenState = compileExpression(cond, newCodeGenState)
-        instructions.addAll(List(
-          Cmp(R1, ImmVal(0)),
-          Branch(endLabel, Condition.EQ)
-        ))
+        instructions.addAll(
+          List(
+            Cmp(R1, ImmVal(0)),
+            Branch(endLabel, Condition.EQ)
+          )
+        )
         doStat.foreach(stat =>
-          newCodeGenState = compileStatWithNewScope(stat, newCodeGenState))
-        instructions.addAll(List(
-          Branch(startLabel),
-          Label(endLabel)
-        ))
-
+          newCodeGenState = compileStatWithNewScope(stat, newCodeGenState)
+        )
+        instructions.addAll(
+          List(
+            Branch(startLabel),
+            Label(endLabel)
+          )
+        )
 
       case Scope(stats) =>
-        stats.foreach(stat => newCodeGenState = compileStatWithNewScope(stat, newCodeGenState))
+        stats.foreach(stat =>
+          newCodeGenState = compileStatWithNewScope(stat, newCodeGenState)
+        )
     }
 
     newCodeGenState
@@ -518,16 +524,14 @@ object CodeGenerator {
           compileExpression(rValueNode.asInstanceOf[Expr], newCodeGenState)
 
       case NewPair(fst, snd) =>
-        newCodeGenState = 
-          compileNewPair(fst, snd, newCodeGenState)
+        newCodeGenState = compileNewPair(fst, snd, newCodeGenState)
 
       case Call(_, _) =>
         newCodeGenState =
           compileFunctionCall(rValueNode.asInstanceOf[Call], newCodeGenState)
 
       case expr: Expr =>
-        newCodeGenState =
-          compileExpression(expr, newCodeGenState)
+        newCodeGenState = compileExpression(expr, newCodeGenState)
 
       case _: PairElem =>
       // TODO
@@ -537,15 +541,21 @@ object CodeGenerator {
   }
 
   def compileNewPair(fst: Expr, snd: Expr, codeGenState: CodeGeneratorState)(
-    implicit instructions: mutable.ListBuffer[Instruction]
+      implicit instructions: mutable.ListBuffer[Instruction]
   ): CodeGeneratorState = {
     var newCodeGenState = codeGenState
     newCodeGenState = compileExpression(fst, newCodeGenState)
     // need to add size of fst and snd somehow
     newCodeGenState = compileExpression(snd, newCodeGenState)
 
-    instructions ++ mutable.ListBuffer(Load(R0, LoadImmVal(PAIR_SIZE)), BranchAndLink("malloc"), 
-    Pop(R2), Pop(R1), Store(R1, OffsetMode(R0)), Store(R2, OffsetMode(R0, shiftAmount = ImmVal(WORD_SIZE))))
+    instructions ++ mutable.ListBuffer(
+      Load(R0, LoadImmVal(PAIR_SIZE)),
+      BranchAndLink("malloc"),
+      Pop(R2),
+      Pop(R1),
+      Store(R1, OffsetMode(R0)),
+      Store(R2, OffsetMode(R0, shiftAmount = ImmVal(WORD_SIZE)))
+    )
 
     newCodeGenState
   }
