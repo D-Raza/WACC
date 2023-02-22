@@ -1,4 +1,4 @@
-milestone := "wacc_examples/valid/basic/skip"
+milestone := "wacc_examples/valid/basic"
 
 all: lint test build
 

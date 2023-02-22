@@ -422,12 +422,10 @@ object CodeGenerator {
       case Return(expr) =>
         val resReg = newCodeGenState.getResReg
         newCodeGenState = compileExpression(expr, newCodeGenState)
-
-        instructions.addAll(
-          List(
-            Move(R0, resReg)
-          )
-        )
+        
+        if (resReg != R0) {
+          instructions += Move(R0, resReg)
+        }
 
         val stackPointerOffsetDiff =
           newCodeGenState.stackPointerOffset - newCodeGenState.getIdentOffset(
@@ -453,12 +451,11 @@ object CodeGenerator {
 
         newCodeGenState = compileExpression(expr, newCodeGenState)
 
-        instructions.addAll(
-          List(
-            Move(R0, resReg),
-            BranchAndLink("exit")
-          )
-        )
+        if (resReg != R0) {
+          instructions += Move(R0, resReg)
+        }
+
+        instructions += BranchAndLink("exit")
 
         val newAvailableRegs = resReg +: newCodeGenState.availableRegs
         newCodeGenState = newCodeGenState.copy(availableRegs = newAvailableRegs)
