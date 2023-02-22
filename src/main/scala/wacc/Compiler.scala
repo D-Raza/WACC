@@ -3,12 +3,17 @@ package wacc
 import parsley.{Failure, Success}
 import wacc.frontend.Parser._
 import wacc.frontend.SemanticAnalyser._
+import wacc.backend._
+import wacc.backend.ARMAssemblyPrinter
 
 import java.io.{File, PrintWriter}
 import scala.io.Source
+import scala.collection.mutable
+import wacc.backend.CodeGenerator
+import wacc.backend.CodeGeneratorState
 
 object Compiler {
-  val DEBUG = false
+  val DEBUG = true
 
   val DUMMY_ASM = """|.data
                      |.text
@@ -57,8 +62,11 @@ object Compiler {
 
     parseResult match {
       case Success(x) => {
-        if (DEBUG)
+        if (DEBUG) {
+          print("Parse tree: ")
           println(x)
+          println()
+        }
 
         implicit val source: File = inputFile
         val errors = checkProgramSemantics(x)
@@ -66,10 +74,22 @@ object Compiler {
           println("No errors found!")
 
           println("Assembling...")
+          implicit val instructions = mutable.ListBuffer[Instruction]()
+          CodeGenerator.compileProgram(x, CodeGeneratorState())
+
+          if (DEBUG) {
+            println("Instructions:")
+            instructions.foreach(println)
+            println()
+          }
+
+          val outputAsm = ARMAssemblyPrinter.printAsm(instructions.toList)
+
           val printWriter = new PrintWriter(
             inputFile.getName.split('.').head + ".s"
           )
-          printWriter.write(DUMMY_ASM)
+          
+          printWriter.write(outputAsm)
           printWriter.write("\n")
           printWriter.close()
         } else {

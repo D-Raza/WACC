@@ -2,7 +2,7 @@ package wacc.backend
 import Condition._
 import Flag._
 
-trait Instruction
+sealed trait Instruction
 
 // Arithmetic instructions
 case class AddInstr(
@@ -72,8 +72,8 @@ case class Store(srcReg: Register, dest: Operand2, cond: Condition = AL)
     extends Instruction
 case class Load(destReg: Register, operand: Operand2, cond: Condition = AL)
     extends Instruction
-case class Pop(srcReg: Register, cond: Condition = AL) extends Instruction
-case class Push(destReg: Register, cond: Condition = AL) extends Instruction
+case class Pop(srcRegs: List[Register], cond: Condition = AL) extends Instruction
+case class Push(destRegs: List[Register], cond: Condition = AL) extends Instruction
 
 // Label instructions
 case class Label(label: String) extends Instruction

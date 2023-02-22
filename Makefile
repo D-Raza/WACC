@@ -18,6 +18,6 @@ build:
 	sbt compile assembly 
 
 clean:
-	sbt clean && rm -rf wacc_examples/ wacc-33-compiler.jar test.log
+	sbt clean && rm -rf wacc_examples/ test_exec/ wacc-33-compiler.jar *.s
 
 .PHONY: all lint format test check build clean 

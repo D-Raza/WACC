@@ -2,6 +2,7 @@ package wacc.backend
 
 import wacc.AST._
 import wacc.backend.Globals.{PAIR_SIZE, WORD_SIZE}
+
 import scala.collection.mutable
 
 object CodeGenerator {
@@ -19,25 +20,28 @@ object CodeGenerator {
 
     instructions.addAll(
       List(
+        Directive("global main"),
         Label("main"),
-        Push(LinkRegister)
+        Push(List(FP, LR)),
+        Move(FP, SP)
       )
     )
+
     newCodeGenState = newCodeGenState.copy(stackPointerOffset =
       newCodeGenState.stackPointerOffset + 4
-    )
+    )  
 
     // Compiles each statement in the program
     programNode.stat.foreach(stat =>
-      newCodeGenState = compileStatWithNewScope(stat, newCodeGenState)
+      newCodeGenState = compileStat(stat, newCodeGenState)
     )
 
+    // Set exit code as 0
+    instructions.addOne(Move(R0, ImmVal(0)))
+    
     instructions.addAll(
       List(
-        // Set exit code as 0
-        Load(R0, LoadImmVal(0)),
-        Pop(ProgramCounter),
-        Directive(".ltorg")
+        Pop(List(FP, PC))
       )
     )
 
@@ -52,6 +56,13 @@ object CodeGenerator {
   ): CodeGeneratorState = {
     var newCodeGenState = codeGenState
 
+    instructions.addAll(
+      List(
+        Push(List(FP, LR)),
+        Move(FP, SP)
+      )
+    )
+
     // Compile each of the parameters in the function declaration
     funcNode.paramList.foreach(param =>
       newCodeGenState = compileParam(param, newCodeGenState)
@@ -60,9 +71,10 @@ object CodeGenerator {
     instructions.addAll(
       List(
         Label("wacc_" + funcNode.ident.name),
-        Push(LinkRegister)
+        Push(List(LR))
       )
     )
+
     newCodeGenState = newCodeGenState.copy(stackPointerOffset =
       newCodeGenState.stackPointerOffset + 4
     )
@@ -74,16 +86,18 @@ object CodeGenerator {
 
     // Compile each of the statements in the function declaration's body
     funcNode.stats.foreach(stat =>
-      newCodeGenState = compileStatWithNewScope(stat, newCodeGenState)
+      newCodeGenState = compileStat(stat, newCodeGenState)
     )
 
     newCodeGenState = newCodeGenState.copy(identToOffset =
       newCodeGenState.identToOffset - "originalSP"
     )
 
+    instructions.addOne(Pop(List(FP)))
+
     instructions.addAll(
       List(
-        Pop(ProgramCounter),
+        Pop(List(FP, PC)),
         Directive(".ltorg")
       )
     )
@@ -137,7 +151,7 @@ object CodeGenerator {
               List(
                 AddInstr(
                   resReg,
-                  StackPointer,
+                  SP,
                   ImmVal(
                     // Get where the function's name in the stack is stored relative to the stack pointer
                     newCodeGenState.stackPointerOffset - newCodeGenState
@@ -150,9 +164,23 @@ object CodeGenerator {
             BranchAndLinkReg(resReg)
           }
           case _ => BranchAndLink("wacc_" + funcCallNode.x.name)
-        },
+        }
+      )
+    )
+
+    
+    if (argsSize > 0) {
+      print("argsSize: " + argsSize)
+      instructions.addAll(
+        List(
         // Set the stack pointer back to its original value
-        AddInstr(StackPointer, StackPointer, ImmVal(argsSize)),
+        AddInstr(SP, SP, ImmVal(argsSize)),
+        )
+      )
+    } 
+
+    instructions.addAll(
+      List(
         // Move result to result register
         Move(resReg, R0)
       )
@@ -278,6 +306,8 @@ object CodeGenerator {
                 Move(resReg, ImmVal(0), Condition.NE)
               )
             )
+
+          case _ => ()
         }
 
         // Register for operand2 is now available for use
@@ -307,6 +337,8 @@ object CodeGenerator {
 
           case Chr(x) =>
             newCodeGenState = compileExpression(x, newCodeGenState)
+
+          case _ => ()
         }
       }
 
@@ -318,7 +350,7 @@ object CodeGenerator {
             instructions += Load(resReg, LoadImmVal(x))
 
           case BoolLiter(x) =>
-            instructions += Move(resReg, ImmVal(if (x) 1 else 0))
+            instructions += Move(resReg, LoadImmVal(if (x) 1 else 0))
 
           case CharLiter(x) =>
             instructions += Move(resReg, ImmChar(x))
@@ -328,12 +360,16 @@ object CodeGenerator {
 
           case Null() =>
             instructions += Load(resReg, LoadImmVal(0))
+          
+          case _ => ()
         }
 
         newCodeGenState = newCodeGenState.copy(availableRegs =
           newCodeGenState.availableRegs.tail
         )
       }
+      
+      case _ => ()
     }
 
     newCodeGenState
@@ -361,8 +397,8 @@ object CodeGenerator {
 
         instructions.addAll(
           List(
-            SubInstr(StackPointer, StackPointer, ImmVal(ty.size)),
-            Store(resReg, OffsetMode(StackPointer))
+            SubInstr(SP, SP, ImmVal(ty.size)),
+            Store(resReg, OffsetMode(SP))
           )
         )
 
@@ -389,18 +425,21 @@ object CodeGenerator {
 
         instructions.addAll(
           List(
-            Move(R0, resReg),
-            AddInstr(
-              StackPointer,
-              StackPointer,
-              ImmVal(
-                newCodeGenState.stackPointerOffset - newCodeGenState
-                  .getIdentOffset("originalSP")
-              )
-            ),
-            Pop(ProgramCounter)
+            Move(R0, resReg)
           )
         )
+
+        val stackPointerOffsetDiff =
+          newCodeGenState.stackPointerOffset - newCodeGenState.getIdentOffset(
+            "originalSP"
+          )
+        if (stackPointerOffsetDiff > 0) {
+          instructions += AddInstr(
+            SP,
+            SP,
+            ImmVal(stackPointerOffsetDiff)
+          )
+        }
 
         val newAvailableRegs = resReg +: newCodeGenState.availableRegs
         val newStackPointerOffset = newCodeGenState.getIdentOffset("originalSP")
@@ -425,17 +464,26 @@ object CodeGenerator {
         newCodeGenState = newCodeGenState.copy(availableRegs = newAvailableRegs)
 
       case Print(_) =>
-      // TODO
+        // TODO
+        instructions.addAll(
+          List(
+            BranchAndLink("TODO_print")
+          )
+        )
 
       case Println(_) =>
-      // TODO
+        // TODO
+        instructions.addAll(
+          List(
+            BranchAndLink("TODO_print")
+          )
+        )
 
       case ifStatNode @ If(_, _, _) =>
         newCodeGenState = compileIfStat(ifStatNode, newCodeGenState)
 
       case While(cond, doStat) =>
-        // TODO: Implement unique while loop namer
-        val uniqueWhileName = "unique_name!" // placeholder
+        val uniqueWhileName = "while_" + codeGenState.getNewLabelId;
         val startLabel = uniqueWhileName + "_start"
         val endLabel = uniqueWhileName + "_end"
         instructions.addAll(
@@ -463,7 +511,7 @@ object CodeGenerator {
       case Scope(stats) =>
         stats.foreach(stat =>
           newCodeGenState = compileStatWithNewScope(stat, newCodeGenState)
-        )
+        ) // TODO - implement compileBlock or similar
     }
 
     newCodeGenState
@@ -551,8 +599,7 @@ object CodeGenerator {
     instructions ++ mutable.ListBuffer(
       Load(R0, LoadImmVal(PAIR_SIZE)),
       BranchAndLink("malloc"),
-      Pop(R2),
-      Pop(R1),
+      Pop(List(R2, R1)),
       Store(R1, OffsetMode(R0)),
       Store(R2, OffsetMode(R0, shiftAmount = ImmVal(WORD_SIZE)))
     )
@@ -563,7 +610,7 @@ object CodeGenerator {
   def compileStatWithNewScope(statNode: Stat, codeGenState: CodeGeneratorState)(
       implicit instructions: mutable.ListBuffer[Instruction]
   ): CodeGeneratorState = {
-    // TODO
-    codeGenState
+    val newCodeGenState = compileStat(statNode, codeGenState)
+    newCodeGenState
   }
 }
