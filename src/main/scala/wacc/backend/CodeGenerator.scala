@@ -29,7 +29,7 @@ object CodeGenerator {
 
     newCodeGenState = newCodeGenState.copy(stackPointerOffset =
       newCodeGenState.stackPointerOffset + 4
-    )  
+    )
 
     // Compiles each statement in the program
     programNode.stat.foreach(stat =>
@@ -38,7 +38,7 @@ object CodeGenerator {
 
     // Set exit code as 0
     instructions.addOne(Move(R0, ImmVal(0)))
-    
+
     instructions.addAll(
       List(
         Pop(List(FP, PC))
@@ -168,16 +168,15 @@ object CodeGenerator {
       )
     )
 
-    
     if (argsSize > 0) {
       print("argsSize: " + argsSize)
       instructions.addAll(
         List(
-        // Set the stack pointer back to its original value
-        AddInstr(SP, SP, ImmVal(argsSize)),
+          // Set the stack pointer back to its original value
+          AddInstr(SP, SP, ImmVal(argsSize))
         )
       )
-    } 
+    }
 
     instructions.addAll(
       List(
@@ -360,7 +359,7 @@ object CodeGenerator {
 
           case Null() =>
             instructions += Load(resReg, LoadImmVal(0))
-          
+
           case _ => ()
         }
 
@@ -368,7 +367,7 @@ object CodeGenerator {
           newCodeGenState.availableRegs.tail
         )
       }
-      
+
       case _ => ()
     }
 
@@ -422,7 +421,7 @@ object CodeGenerator {
       case Return(expr) =>
         val resReg = newCodeGenState.getResReg
         newCodeGenState = compileExpression(expr, newCodeGenState)
-        
+
         if (resReg != R0) {
           instructions += Move(R0, resReg)
         }

@@ -8,9 +8,13 @@ object ARMAssemblyPrinter {
     // Arithmetic instructions
     // TODO: Handle signed and unsigned flags
     case AddInstr(destReg, operand1, operand2, cond, flag) =>
-      s"    add${cond.toString}${flag.map(f => s".$f").getOrElse("")} ${printReg(destReg)}, ${printReg(operand1)}, ${printOperand2(operand2)}"
+      s"    add${cond.toString}${flag.map(f => s".$f").getOrElse("")} ${printReg(
+          destReg
+        )}, ${printReg(operand1)}, ${printOperand2(operand2)}"
     case SubInstr(destReg, operand1, operand2, cond, flag) =>
-      s"    sub${cond.toString}${flag.map(f => s".$f").getOrElse("")} ${printReg(destReg)}, ${printReg(operand1)}, ${printOperand2(operand2)}"
+      s"    sub${cond.toString}${flag.map(f => s".$f").getOrElse("")} ${printReg(
+          destReg
+        )}, ${printReg(operand1)}, ${printOperand2(operand2)}"
     case Rsb(destReg, operand1, operand2, cond) =>
       s"    rsb${cond.toString} ${printReg(destReg)}, ${printReg(operand1)}, ${printOperand2(operand2)}"
     case SMull(rdLo, rdHi, rn, rm, cond) =>
@@ -23,7 +27,7 @@ object ARMAssemblyPrinter {
       s"    eor${cond.toString} ${printReg(destReg)}, ${printReg(operand1)}, ${printOperand2(operand2)}"
     case XorInstr(destReg, operand1, operand2, cond) =>
       s"    xor${cond.toString} ${printReg(destReg)}, ${printReg(operand1)}, ${printOperand2(operand2)}"
-    
+
     // Data transfer instructions
     case Move(destReg, operand2, cond) =>
       s"    mov${cond.toString} ${printReg(destReg)}, ${printOperand2(operand2)}"
@@ -31,18 +35,18 @@ object ARMAssemblyPrinter {
       s"    str${cond.toString} ${printReg(destReg)}, ${printOperand2(operand2)}"
     case Load(destReg, operand2, cond) =>
       s"    ldr${cond.toString} ${printReg(destReg)}, ${printOperand2(operand2)}"
-    case Pop(srcRegs, cond) => 
+    case Pop(srcRegs, cond) =>
       s"    pop${cond.toString} {${srcRegs.map(printReg).mkString(", ")}}"
     case Push(destRegs, cond) =>
       s"    push${cond.toString} {${destRegs.map(printReg).mkString(", ")}}"
-    
+
     // Label instructions
-    case Label(label) => s"$label:"
+    case Label(label)             => s"$label:"
     case Directive(directiveType) => s".$directiveType"
 
     // Branch instructions
-    case Branch(label, cond) => s"    b${cond.toString} $label"
-    case BranchAndLink(label, cond) => s"    bl${cond.toString} $label"
+    case Branch(label, cond)         => s"    b${cond.toString} $label"
+    case BranchAndLink(label, cond)  => s"    bl${cond.toString} $label"
     case BranchAndLinkReg(reg, cond) => s"    blx${cond.toString} $reg"
 
     // Compare instruction
@@ -51,25 +55,34 @@ object ARMAssemblyPrinter {
   }
 
   def printOperand2(operand2: Operand2): String = operand2 match {
-    case ImmVal(x) => s"#$x"
-    case ImmChar(c) => s"#\'$c\'"
-    case LoadImmVal(x) => s"=$x"
-    case reg: Register => printReg(reg)
+    case ImmVal(x)           => s"#$x"
+    case ImmChar(c)          => s"#\'$c\'"
+    case LoadImmVal(x)       => s"=$x"
+    case reg: Register       => printReg(reg)
     case op2: AddressingMode => printAddressingMode(op2)
   }
 
   def printAddressingMode(op2: AddressingMode): String = op2 match {
-    case OffsetMode(baseReg, auxReg, shiftType, shiftAmount) => s"[${printReg(baseReg)}${auxReg.map(r => s", ${printReg(r)}").getOrElse("")}${shiftType.map(s => s", ${s.toString}").getOrElse("")}${printOperand2(shiftAmount)}]"
-    case PreIndexedMode(baseReg, auxReg, shiftType, shiftAmount) => s"[${printReg(baseReg)}${auxReg.map(r => s", ${printReg(r)}").getOrElse("")}${shiftType.map(s => s", ${s.toString}").getOrElse("")}${printOperand2(shiftAmount)}]!"
-    case PostIndexedMode(baseReg, auxReg, shiftType, shiftAmount) => s"[${printReg(baseReg)}${auxReg.map(r => s", ${printReg(r)}").getOrElse("")}${shiftType.map(s => s", ${s.toString}").getOrElse("")}${printOperand2(shiftAmount)}]"
+    case OffsetMode(baseReg, auxReg, shiftType, shiftAmount) =>
+      s"[${printReg(baseReg)}${auxReg.map(r => s", ${printReg(r)}").getOrElse("")}${shiftType
+          .map(s => s", ${s.toString}")
+          .getOrElse("")}${printOperand2(shiftAmount)}]"
+    case PreIndexedMode(baseReg, auxReg, shiftType, shiftAmount) =>
+      s"[${printReg(baseReg)}${auxReg.map(r => s", ${printReg(r)}").getOrElse("")}${shiftType
+          .map(s => s", ${s.toString}")
+          .getOrElse("")}${printOperand2(shiftAmount)}]!"
+    case PostIndexedMode(baseReg, auxReg, shiftType, shiftAmount) =>
+      s"[${printReg(baseReg)}${auxReg.map(r => s", ${printReg(r)}").getOrElse("")}${shiftType
+          .map(s => s", ${s.toString}")
+          .getOrElse("")}${printOperand2(shiftAmount)}]"
     case _ => "@ TODO"
   }
 
   def printReg(reg: Register): String = reg match {
-    case SP => "sp"
-    case LR => "lr"
-    case PC => "pc"
-    case FP => "fp"
+    case SP            => "sp"
+    case LR            => "lr"
+    case PC            => "pc"
+    case FP            => "fp"
     case reg: Register => s"r${reg.n}"
   }
 }

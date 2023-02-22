@@ -88,7 +88,7 @@ object Compiler {
           val printWriter = new PrintWriter(
             inputFile.getName.split('.').head + ".s"
           )
-          
+
           printWriter.write(outputAsm)
           printWriter.write("\n")
           printWriter.close()
