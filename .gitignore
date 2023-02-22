@@ -66,3 +66,5 @@ wacc-33-compiler.jar
 # test script files
 /wacc_examples
 test.log
+*.s
+/test_exec

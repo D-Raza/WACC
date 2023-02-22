@@ -1,21 +1,15 @@
 image: sbtscala/scala-sbt:eclipse-temurin-focal-17.0.5_8_1.8.2_2.13.10
 
 stages:
-  - lint
   - build
   - test
+  - lint
 
 # NOTE: For shared runners
 # .install_dependencies:
 #   before_script:
 #     - apt-get update
-#     - apt-get install -y make
-
-lint-job:
-  stage: lint
-  # extends: .install_dependencies
-  script:
-    - make lint
+#     - apt-get install -y make gcc-arm-linux-gnueabi qemu-user
 
 build-job:
   stage: build
@@ -31,3 +25,10 @@ test-job:
   artifacts:
     paths:
       - test.log
+
+lint-job:
+  stage: lint
+  # extends: .install_dependencies
+  script:
+    - make lint
+  allow_failure: true

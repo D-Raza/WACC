@@ -3,12 +3,29 @@ package wacc
 import parsley.{Failure, Success}
 import wacc.frontend.Parser._
 import wacc.frontend.SemanticAnalyser._
+import wacc.backend._
+import wacc.backend.ARMAssemblyPrinter
 
-import java.io.File
+import java.io.{File, PrintWriter}
 import scala.io.Source
+import scala.collection.mutable
+import wacc.backend.CodeGenerator
+import wacc.backend.CodeGeneratorState
 
 object Compiler {
-  val DEBUG = false
+  val DEBUG = true
+
+  val DUMMY_ASM = """|.data
+                     |.text
+                     |.global main
+                     |main:
+                     |    push {fp, lr}
+                     |    push {r8, r10, r12}
+                     |    mov fp, sp
+                     |    mov r0, #0
+                     |    pop {r8, r10, r12}
+                     |    pop {fp, pc}
+                """.stripMargin
 
   def main(args: Array[String]): Unit = {
     // Argument checking
@@ -45,13 +62,36 @@ object Compiler {
 
     parseResult match {
       case Success(x) => {
-        if (DEBUG)
+        if (DEBUG) {
+          print("Parse tree: ")
           println(x)
+          println()
+        }
 
         implicit val source: File = inputFile
         val errors = checkProgramSemantics(x)
         if (errors.isEmpty) {
           println("No errors found!")
+
+          println("Assembling...")
+          implicit val instructions = mutable.ListBuffer[Instruction]()
+          CodeGenerator.compileProgram(x, CodeGeneratorState())
+
+          if (DEBUG) {
+            println("Instructions:")
+            instructions.foreach(println)
+            println()
+          }
+
+          val outputAsm = ARMAssemblyPrinter.printAsm(instructions.toList)
+
+          val printWriter = new PrintWriter(
+            inputFile.getName.split('.').head + ".s"
+          )
+
+          printWriter.write(outputAsm)
+          printWriter.write("\n")
+          printWriter.close()
         } else {
           println("Errors found:")
           errors.foreach(println)
@@ -60,9 +100,6 @@ object Compiler {
       }
       case Failure(msg) => { println(msg); exitCode = 100 }
     }
-
-    // TODO: Backend
-    // println("Assembling...")
 
     println("Exit code: " + exitCode)
     System.exit(exitCode)
