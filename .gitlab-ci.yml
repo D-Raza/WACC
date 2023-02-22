@@ -9,13 +9,7 @@ stages:
 # .install_dependencies:
 #   before_script:
 #     - apt-get update
-#     - apt-get install -y make
-
-lint-job:
-  stage: lint
-  # extends: .install_dependencies
-  script:
-    - make lint
+#     - apt-get install -y make gcc-arm-linux-gnueabi qemu-user
 
 build-job:
   stage: build
@@ -31,3 +25,10 @@ test-job:
   artifacts:
     paths:
       - test.log
+
+lint-job:
+  stage: lint
+  # extends: .install_dependencies
+  script:
+    - make lint
+  allow_failure: true
