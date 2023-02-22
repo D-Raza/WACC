@@ -422,7 +422,7 @@ object CodeGenerator {
         val resReg = newCodeGenState.getResReg
         newCodeGenState = compileExpression(expr, newCodeGenState)
 
-        if (resReg                          != R0)
+        if (resReg != R0)
           instructions += Move(R0, resReg)
 
         val stackPointerOffsetDiff =
