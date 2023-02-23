@@ -1,17 +1,7 @@
 package wacc.backend
 import ShiftType._
 
-trait Operand2 {
-  override def toString: String = {
-    this match {
-      case ImmVal(x)           => s"#$x"
-      case ImmChar(c)          => s"#\'$c\'"
-      case LoadImmVal(x)       => s"=$x"
-      case adm: AddressingMode => adm.toString()
-      case reg: Register       => reg.toString()
-    }
-  }
-}
+trait Operand2
 
 // Addressing modes
 sealed trait AddressingMode extends Operand2 {
@@ -22,7 +12,7 @@ sealed trait AddressingMode extends Operand2 {
   override def toString: String = {
     s"[${baseReg.toString()}${auxReg.map(r => s", ${r.toString()}").getOrElse("")}${shiftType
         .map(s => s", ${s.toString}")
-        .getOrElse("")}${shiftAmount.toString()}]"
+        .getOrElse("")}, ${shiftAmount.toString()}]"
   }
 }
 
@@ -48,10 +38,16 @@ case class PreIndexedMode(
 ) extends AddressingMode
 
 // Immediate value
-case class ImmVal(value: Int) extends Operand2
+case class ImmVal(value: Int) extends Operand2 {
+  override def toString: String = s"#$value"
+}
 
 // Immediate char
-case class ImmChar(char: Char) extends Operand2
+case class ImmChar(char: Char) extends Operand2 {
+  override def toString: String = s"#\'$char\'"
+}
 
 // Load immediate value
-case class LoadImmVal(value: Int) extends Operand2
+case class LoadImmVal(value: Int) extends Operand2 {
+  override def toString: String = s"=$value"
+}

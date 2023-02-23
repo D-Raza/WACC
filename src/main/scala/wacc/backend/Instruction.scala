@@ -52,8 +52,17 @@ case class SMull(
 
   override val opcode: String = "smull"
   override def opsToString: String = s"$rdLo, $rdHi, $rn, $rm"
-
 }
+
+// case class Div(
+//     destReg: Register,
+//     operand1: Register, // numerator
+//     operand2: Register, // denominator
+//     cond: Condition = AL
+// ) extends Instruction {
+//   override val opcode: String = "__aeabi_idiv"
+//   override def opsToString: String = s"$destReg, $operand1, $operand2"
+// }
 
 // Logical instructions
 case class AndInstr(

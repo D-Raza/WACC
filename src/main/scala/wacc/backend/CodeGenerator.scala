@@ -211,14 +211,42 @@ object CodeGenerator {
         /* Compile the first and second expression in the binary expression,
            and add the corresponding instructions needed to instructions list */
         exprNode match {
+          // TODO: Overflow
           case Mult(x, y) =>
-          // TODO
+            newCodeGenState = compileExpression(x, newCodeGenState)
+            newCodeGenState = compileExpression(y, newCodeGenState)
+            instructions += SMull(
+              operand1Reg,
+              operand2Reg,
+              operand1Reg,
+              operand2Reg
+            )
 
+          // TODO
           case Div(x, y) =>
-          // TODO
+            newCodeGenState = compileExpression(x, newCodeGenState)
+            newCodeGenState = compileExpression(y, newCodeGenState)
+            instructions.addAll(
+              List(
+                BranchAndLink(
+                  "__aeabi_idiv"
+                ), // signed __aeabi_idiv(signed numerator, signed denominator)
+                Move(resReg, R0)
+              )
+            )
 
-          case Mod(x, y) =>
           // TODO
+          case Mod(x, y) =>
+            newCodeGenState = compileExpression(x, newCodeGenState)
+            newCodeGenState = compileExpression(y, newCodeGenState)
+            instructions.addAll(
+              List(
+                BranchAndLink(
+                  "__aeabi_idivmod"
+                ), // signed __aeabi_idivmod(signed numerator, signed denominator)
+                Move(resReg, R1)
+              )
+            )
 
           case Add(x, y) =>
             newCodeGenState = compileExpression(x, newCodeGenState)
@@ -349,7 +377,7 @@ object CodeGenerator {
             instructions += Load(resReg, LoadImmVal(x))
 
           case BoolLiter(x) =>
-            instructions += Move(resReg, LoadImmVal(if (x) 1 else 0))
+            instructions += Load(resReg, LoadImmVal(if (x) 1 else 0))
 
           case CharLiter(x) =>
             instructions += Move(resReg, ImmChar(x))
@@ -385,8 +413,11 @@ object CodeGenerator {
 
       case Assign(lValue, rValue) => {
         newCodeGenState = compileRValue(rValue, newCodeGenState)
-        // newCodeGenState = compileLValue(lValue, newCodeGenState)
-        // TODO
+        newCodeGenState = compileLValue(lValue, newCodeGenState)
+        instructions += Store(
+          newCodeGenState.getResReg,
+          OffsetMode(newCodeGenState.getResReg)
+        )
       }
 
       case Declare(ty, x, y) =>
@@ -396,8 +427,8 @@ object CodeGenerator {
 
         instructions.addAll(
           List(
-            SubInstr(SP, SP, ImmVal(ty.size)),
-            Store(resReg, OffsetMode(SP))
+            SubInstr(FP, FP, ImmVal(ty.size)), // SP, SP, -ty.size
+            Store(resReg, OffsetMode(FP)) // OffsetMode(SP)
           )
         )
 
@@ -580,6 +611,28 @@ object CodeGenerator {
     }
 
     newCodeGenState
+  }
+
+  def compileLValue(lValueNode: LValue, codeGenState: CodeGeneratorState)(
+      implicit instructions: mutable.ListBuffer[Instruction]
+  ): CodeGeneratorState = {
+    var newCodeGenState = codeGenState
+    lValueNode match {
+      case ident: Ident =>
+        newCodeGenState = compileIdent(ident, newCodeGenState)
+      case ArrayElem(_, _) => // TODO
+      case _: PairElem     => // TODO
+    }
+    newCodeGenState
+  }
+
+  private def compileIdent(ident: Ident, codeGenState: CodeGeneratorState)(
+      implicit instructions: mutable.ListBuffer[Instruction]
+  ): CodeGeneratorState = {
+    // using FP
+    val offset = codeGenState.getIdentOffset(ident.name)
+    instructions += Load(R1, OffsetMode(FP, shiftAmount = ImmVal(offset)))
+    codeGenState
   }
 
   def compileNewPair(fst: Expr, snd: Expr, codeGenState: CodeGeneratorState)(
