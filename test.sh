@@ -1,5 +1,7 @@
 #!/bin/bash
 
+shopt -s extglob
+
 LOGFILE="test.log"
 EXECDIR="test_exec"
 NO_THREADS=4
@@ -21,11 +23,12 @@ else
   cd ..
 fi
 
-if [ ! -d $EXECDIR ]; then
-    mkdir $EXECDIR
+if [ ! -d "$EXECDIR" ]; then
+    mkdir "$EXECDIR"
+else
+    rm -rf "$EXECDIR/*"
 fi
-
-shopt -s extglob
+rm -f *.s
 
 # Find all .wacc files in directory
 dir=${1:-wacc_examples}
@@ -129,9 +132,8 @@ test_task() {
         echo -e "\e[34m--- Emulator Output Difference ---\e[0m"
         echo "$emulator_output"
         echo "$output_diff"
+        echo
     fi
-    
-    echo
   
     exit 0
 }

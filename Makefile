@@ -1,4 +1,4 @@
-milestone := "wacc_examples/valid/basic wacc_examples/valid/variables"
+milestone := "wacc_examples/valid/@(basic|variables)"
 
 all: lint test build
 
