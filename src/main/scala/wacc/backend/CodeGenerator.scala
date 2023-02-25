@@ -483,29 +483,31 @@ object CodeGenerator {
       case ifStatNode @ If(_, _, _) =>
         newCodeGenState = compileIfStat(ifStatNode, newCodeGenState)
 
-      case While(cond, doStat) =>
+      case While(cond, bodyStat) =>
         val uniqueWhileName = "while_" + codeGenState.getNewLabelId;
-        val startLabel = uniqueWhileName + "_start"
-        val endLabel = uniqueWhileName + "_end"
-        val condReg = newCodeGenState.getResReg
+        val condLabel = uniqueWhileName + "_cond"
+        val bodyLabel = uniqueWhileName + "_body"
+        instructions += Branch(condLabel)
 
-        instructions += Label(startLabel)
-        newCodeGenState = compileExpression(cond, newCodeGenState)
-        instructions.addAll(
-          List(
-            Cmp(condReg, ImmVal(0)),
-            Branch(endLabel, Condition.EQ)
-          )
-        )
-        doStat.foreach(stat =>
+        instructions += Label(bodyLabel)
+        bodyStat.foreach(stat =>
           newCodeGenState = compileStatWithNewScope(stat, newCodeGenState)
         )
+
+        val condReg = newCodeGenState.getResReg
+
+        instructions += Label(condLabel)
+        newCodeGenState = compileExpression(cond, newCodeGenState)
+
         instructions.addAll(
           List(
-            Branch(startLabel),
-            Label(endLabel)
+            Cmp(condReg, ImmVal(1)),
+            Branch(bodyLabel, Condition.EQ)
           )
         )
+
+        val newAvailableRegs = condReg +: newCodeGenState.availableRegs
+        newCodeGenState = newCodeGenState.copy(availableRegs = newAvailableRegs)
 
       case Scope(stats) =>
         stats.foreach(stat =>
