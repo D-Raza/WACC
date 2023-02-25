@@ -487,12 +487,13 @@ object CodeGenerator {
         val uniqueWhileName = "while_" + codeGenState.getNewLabelId;
         val startLabel = uniqueWhileName + "_start"
         val endLabel = uniqueWhileName + "_end"
-        instructions += Label(startLabel)
+        val condReg = newCodeGenState.getResReg
 
+        instructions += Label(startLabel)
         newCodeGenState = compileExpression(cond, newCodeGenState)
         instructions.addAll(
           List(
-            Cmp(R1, ImmVal(0)),
+            Cmp(condReg, ImmVal(0)),
             Branch(endLabel, Condition.EQ)
           )
         )
