@@ -142,31 +142,7 @@ object CodeGenerator {
       newCodeGenState = compileExpression(arg, newCodeGenState)
     )
 
-    instructions.addAll(
-      List(
-        // Navigate to function
-        funcCallNode.x.name match {
-          case "" => {
-            instructions.addAll(
-              List(
-                AddInstr(
-                  resReg,
-                  SP,
-                  ImmVal(
-                    // Get where the function's name in the stack is stored relative to the stack pointer
-                    newCodeGenState.stackPointerOffset - newCodeGenState
-                      .getIdentOffset(funcCallNode.x.name)
-                  )
-                ),
-                Load(resReg, OffsetMode(resReg))
-              )
-            )
-            BranchAndLinkReg(resReg)
-          }
-          case _ => BranchAndLink("wacc_" + funcCallNode.x.name)
-        }
-      )
-    )
+    instructions += BranchAndLink("wacc_" + funcCallNode.x.name);
 
     if (argsSize > 0) {
       print("argsSize: " + argsSize)
