@@ -527,28 +527,16 @@ object CodeGenerator {
     // Compile condition
     var newCodeGenState = compileExpression(ifNode.cond, codeGenState)
 
-    val elseLabelId = newCodeGenState.getNewLabelId
-    val endLabelId = newCodeGenState.getNewLabelId
-
-    instructions.addAll(
-      List(
-        Cmp(condReg, ImmVal(0)),
-        Branch("l_" + elseLabelId, Condition.EQ)
-      )
-    )
-
     val newAvailableRegs = condReg +: newCodeGenState.availableRegs
     newCodeGenState = newCodeGenState.copy(availableRegs = newAvailableRegs)
 
-    // Compile then statement
-    ifNode.thenStat.foreach(stat =>
-      newCodeGenState = compileStatWithNewScope(stat, newCodeGenState)
-    )
+    val thenLabel = "l_" + newCodeGenState.getNewLabelId
+    val endLabel = "l_" + newCodeGenState.getNewLabelId
 
     instructions.addAll(
       List(
-        Branch("l_" + endLabelId),
-        Label(elseLabelId.toString())
+        Cmp(condReg, ImmVal(1)),
+        Branch(thenLabel, Condition.EQ)
       )
     )
 
@@ -557,7 +545,19 @@ object CodeGenerator {
       newCodeGenState = compileStatWithNewScope(stat, newCodeGenState)
     )
 
-    instructions += Label(endLabelId.toString())
+    instructions.addAll(
+      List(
+        Branch(endLabel),
+        Label(thenLabel)
+      )
+    )
+
+    // Compile then statement
+    ifNode.thenStat.foreach(stat =>
+      newCodeGenState = compileStatWithNewScope(stat, newCodeGenState)
+    )
+
+    instructions += Label(endLabel)
 
     newCodeGenState
   }
