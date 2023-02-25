@@ -144,17 +144,17 @@ case class Directive(directiveType: String) extends Instruction {
 // Branch instructions
 case class Branch(label: String, cond: Condition = AL) extends Instruction {
   override def opsToString = label
-  override val opcode = "b"
+  override val opcode = "b" + cond
 }
 case class BranchAndLink(label: String, cond: Condition = AL)
     extends Instruction {
   override def opsToString = label
-  override val opcode = "bl"
+  override val opcode = "bl" + cond
 }
 case class BranchAndLinkReg(reg: Register, cond: Condition = AL)
     extends Instruction {
   override def opsToString: String = reg.toString()
-  override val opcode = "blx"
+  override val opcode = "blx" + cond
 }
 
 // Compare instruction

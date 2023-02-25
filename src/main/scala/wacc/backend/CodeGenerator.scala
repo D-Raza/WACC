@@ -142,7 +142,7 @@ object CodeGenerator {
       newCodeGenState = compileExpression(arg, newCodeGenState)
     )
 
-    instructions += BranchAndLink("wacc_" + funcCallNode.x.name);
+    instructions += BranchAndLink("wacc_" + funcCallNode.x.name)
 
     if (argsSize > 0) {
       print("argsSize: " + argsSize)
@@ -487,11 +487,8 @@ object CodeGenerator {
         val uniqueWhileName = "while_" + codeGenState.getNewLabelId;
         val startLabel = uniqueWhileName + "_start"
         val endLabel = uniqueWhileName + "_end"
-        instructions.addAll(
-          List(
-            Label(startLabel)
-          )
-        )
+        instructions += Label(startLabel)
+
         newCodeGenState = compileExpression(cond, newCodeGenState)
         instructions.addAll(
           List(
