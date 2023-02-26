@@ -465,7 +465,7 @@ object CodeGenerator {
         newCodeGenState = newCodeGenState.copy(availableRegs = newAvailableRegs)
 
       case Print(_) =>
-        // TODO
+        // TODO: How do we get the type of expr in the print?
         instructions.addAll(
           List(
             BranchAndLink("TODO_print")
