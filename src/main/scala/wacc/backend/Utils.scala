@@ -1,6 +1,7 @@
 package wacc.backend
 import wacc.backend._
 import wacc.backend.Globals.WORD_SIZE
+import wacc.backend.Condition.{EQ, NE}
 
 import scala.collection.mutable
 
@@ -81,6 +82,21 @@ object Utils {
     }
 
     def printBool()(implicit instructions: mutable.ListBuffer[Instruction]): Unit = {
+        val trueDataFormat = "true\u0000"
+        val falseDataFormat = "false\u0000"
+        instructions.addAll(
+            List(
+                Label("p_print_bool"),
+                Push(List(LR)),
+                Cmp(R0, ImmVal(0)),
+                Load(R0, LabelOp(Labels.addDataMsg(trueDataFormat)), NE),
+                Load(R1, LabelOp(Labels.addDataMsg(falseDataFormat)), EQ),
+                BranchAndLink("printf"),
+                Move(R0, ImmVal(0)),
+                BranchAndLink("fflush"),
+                Pop(List(PC))
+            )
+        )
 
     }
 
@@ -92,7 +108,9 @@ object Utils {
                 Label("p_print_ln"),
                 Push(List(LR)),
                 Load(R0, LabelOp(Labels.addDataMsg("\n"))),
-                BranchAndLink("putchar"),
+                BranchAndLink("printf"), // puts?
+                Move(R0, ImmVal(0)),
+                BranchAndLink("fflush"),
                 Pop(List(PC))
             )
         )

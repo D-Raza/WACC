@@ -474,6 +474,7 @@ object CodeGenerator {
         newCodeGenState = newCodeGenState.copy(availableRegs = newAvailableRegs)
 
       case Print(expr) =>
+        newCodeGenState = compileExpression(expr, newCodeGenState)
         printTable.get(expr.pos) match {
           case Some(IntType()) => 
             if (!Utils.printIntFlag) {
@@ -504,44 +505,40 @@ object CodeGenerator {
             instructions += BranchAndLink("p_print_reference")
         }
         
-        newCodeGenState = compileExpression(expr, newCodeGenState)
-
       case Println(expr) =>
+         newCodeGenState = compileExpression(expr, newCodeGenState)
          printTable.get(expr.pos) match {
           case Some(IntType()) => 
             if (!Utils.printIntFlag) {
               Utils.printIntFlag = true
               Labels.addDataMsg("%d\u0000")
-              instructions += BranchAndLink("p_print_int")
             }
+            instructions += BranchAndLink("p_print_int")
           case Some(CharType()) => 
             if (!Utils.printCharFlag) {
               Utils.printCharFlag = true
               instructions += BranchAndLink("p_print_char")
             }
           case Some(StringType()) | Some(ArrayType(CharType())) => 
-            if (!Utils.printStringFlag) {
+            if (!Utils.printStringFlag) 
               Utils.printStringFlag = true
-              instructions += BranchAndLink("p_print_string")
-            }
+            instructions += BranchAndLink("p_print_string")
           case Some(BoolType()) => 
             if (!Utils.printBoolFlag) {
               Utils.printBoolFlag = true
-              instructions += BranchAndLink("p_print_bool")
+              Labels.addDataMsg("false\u0000")
+              Labels.addDataMsg("true\u0000")
             }
+            instructions += BranchAndLink("p_print_bool")
           case _ =>
             if (!Utils.printRefFlag) {
               Utils.printRefFlag = true
               Labels.addDataMsg("%p\u0000")
-              instructions += BranchAndLink("p_print_reference")
             }
+            instructions += BranchAndLink("p_print_reference")
         }
-
-        newCodeGenState = compileExpression(expr, newCodeGenState)
-        if (!Utils.printlnFlag) {
-          Utils.printlnFlag = true
-          instructions += BranchAndLink("p_print_ln")
-        }
+        Utils.printlnFlag = true
+        instructions += BranchAndLink("p_print_ln")
 
       case ifStatNode @ If(_, _, _) =>
         newCodeGenState = compileIfStat(ifStatNode, newCodeGenState)
