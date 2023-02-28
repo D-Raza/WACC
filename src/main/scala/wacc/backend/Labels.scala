@@ -10,7 +10,7 @@ object Labels {
       mutable.ListBuffer(
         Label(label),
         Directive(s"word $actualSize"),
-        Directive(s"ascii " + "\"" + s + "\""))
+        Directive(s"asciz " + "\"" + s + "\""))
   }
 
   val dataMap: mutable.LinkedHashMap[String, Data] = mutable.LinkedHashMap().empty
@@ -44,8 +44,7 @@ object Labels {
         case '\f' => "\\f"
         case '\r' => "\\r"
         case '\"' => "\\\""
-        case '\'' => "\\\'"
-        case '\\' => "\\\\"
+        case '\'' => "\\'"
         case _ => c.toString
     }
   }
