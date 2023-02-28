@@ -2,6 +2,7 @@ package wacc.backend
 
 import wacc.AST._
 import wacc.backend.Globals.{PAIR_SIZE, WORD_SIZE}
+import wacc.backend.Utils
 
 import scala.collection.mutable
 
@@ -16,6 +17,8 @@ object CodeGenerator {
     programNode.funcs.foreach(func =>
       newCodeGenState = newCodeGenState.addFunctionName(func.ident.name)
     )
+
+    implicit val printTable: Map[(Int, Int), Type] = programNode.printTable
     programNode.funcs.foreach(func => compileFunc(func, newCodeGenState))
 
     instructions.addAll(
@@ -45,15 +48,22 @@ object CodeGenerator {
       )
     )
 
+    Utils.addUtils()(instructions)
+
+    val data = Labels.dataMap
+    if (data.nonEmpty) {
+      data.flatMap(kv => kv._2.instruction) ++=: instructions
+      Directive("data") +=: instructions
+    }
+
     newCodeGenState.copy(stackPointerOffset =
       newCodeGenState.stackPointerOffset - 4
     )
   }
 
   // Compiles function declaration
-  def compileFunc(funcNode: Func, codeGenState: CodeGeneratorState)(implicit
-      instructions: mutable.ListBuffer[Instruction]
-  ): CodeGeneratorState = {
+  def compileFunc(funcNode: Func, codeGenState: CodeGeneratorState)
+                 (implicit instructions: mutable.ListBuffer[Instruction], printTable: Map[(Int, Int), Type]): CodeGeneratorState = {
     var newCodeGenState = codeGenState
 
     instructions.addAll(
@@ -359,7 +369,7 @@ object CodeGenerator {
             instructions += Move(resReg, ImmChar(x))
 
           case StrLiter(x) =>
-          // TODO
+            instructions += Load(resReg, LabelOp(Labels.addDataMsg(x)))
 
           case Null() =>
             instructions += Load(resReg, LoadImmVal(0))
@@ -378,9 +388,8 @@ object CodeGenerator {
     newCodeGenState
   }
 
-  def compileStat(statNode: Stat, codeGenState: CodeGeneratorState)(implicit
-      instructions: mutable.ListBuffer[Instruction]
-  ): CodeGeneratorState = {
+  def compileStat(statNode: Stat, codeGenState: CodeGeneratorState)
+                 (implicit instructions: mutable.ListBuffer[Instruction], printTable: Map[(Int, Int), Type]): CodeGeneratorState = {
     var newCodeGenState = codeGenState
 
     statNode match {
@@ -464,21 +473,75 @@ object CodeGenerator {
         val newAvailableRegs = resReg +: newCodeGenState.availableRegs
         newCodeGenState = newCodeGenState.copy(availableRegs = newAvailableRegs)
 
-      case Print(_) =>
-        // TODO: How do we get the type of expr in the print?
-        instructions.addAll(
-          List(
-            BranchAndLink("TODO_print")
-          )
-        )
+      case Print(expr) =>
+        printTable.get(expr.pos) match {
+          case Some(IntType()) => 
+            if (!Utils.printIntFlag) {
+              Utils.printIntFlag = true
+              Labels.addDataMsg("%d\u0000")
+            }
+            instructions += BranchAndLink("p_print_int")
+          case Some(CharType()) => 
+            if (!Utils.printCharFlag) 
+              Utils.printCharFlag = true
+            instructions += BranchAndLink("p_print_char")
+          case Some(StringType()) | Some(ArrayType(CharType())) => 
+            if (!Utils.printStringFlag) 
+              Utils.printStringFlag = true
+            instructions += BranchAndLink("p_print_string")
+          case Some(BoolType()) => 
+            if (!Utils.printBoolFlag) {
+              Utils.printBoolFlag = true
+              Labels.addDataMsg("false\u0000")
+              Labels.addDataMsg("true\u0000")
+            }
+            instructions += BranchAndLink("p_print_bool")
+          case _ =>
+            if (!Utils.printRefFlag) {
+              Utils.printRefFlag = true
+              Labels.addDataMsg("%p\u0000")
+            }
+            instructions += BranchAndLink("p_print_reference")
+        }
+        
+        newCodeGenState = compileExpression(expr, newCodeGenState)
 
-      case Println(_) =>
-        // TODO
-        instructions.addAll(
-          List(
-            BranchAndLink("TODO_print")
-          )
-        )
+      case Println(expr) =>
+         printTable.get(expr.pos) match {
+          case Some(IntType()) => 
+            if (!Utils.printIntFlag) {
+              Utils.printIntFlag = true
+              Labels.addDataMsg("%d\u0000")
+              instructions += BranchAndLink("p_print_int")
+            }
+          case Some(CharType()) => 
+            if (!Utils.printCharFlag) {
+              Utils.printCharFlag = true
+              instructions += BranchAndLink("p_print_char")
+            }
+          case Some(StringType()) | Some(ArrayType(CharType())) => 
+            if (!Utils.printStringFlag) {
+              Utils.printStringFlag = true
+              instructions += BranchAndLink("p_print_string")
+            }
+          case Some(BoolType()) => 
+            if (!Utils.printBoolFlag) {
+              Utils.printBoolFlag = true
+              instructions += BranchAndLink("p_print_bool")
+            }
+          case _ =>
+            if (!Utils.printRefFlag) {
+              Utils.printRefFlag = true
+              Labels.addDataMsg("%p\u0000")
+              instructions += BranchAndLink("p_print_reference")
+            }
+        }
+
+        newCodeGenState = compileExpression(expr, newCodeGenState)
+        if (!Utils.printlnFlag) {
+          Utils.printlnFlag = true
+          instructions += BranchAndLink("p_print_ln")
+        }
 
       case ifStatNode @ If(_, _, _) =>
         newCodeGenState = compileIfStat(ifStatNode, newCodeGenState)
@@ -519,9 +582,8 @@ object CodeGenerator {
   }
 
   // Compiles 'if-then-else' statements
-  def compileIfStat(ifNode: If, codeGenState: CodeGeneratorState)(implicit
-      instructions: mutable.ListBuffer[Instruction]
-  ): CodeGeneratorState = {
+  def compileIfStat(ifNode: If, codeGenState: CodeGeneratorState)
+                   (implicit instructions: mutable.ListBuffer[Instruction], printTable: Map[(Int, Int), Type]): CodeGeneratorState = {
     val condReg = codeGenState.getResReg
 
     // Compile condition
@@ -563,7 +625,7 @@ object CodeGenerator {
   }
 
   def compileRValue(rValueNode: RValue, codeGenState: CodeGeneratorState)(
-      implicit instructions: mutable.ListBuffer[Instruction]
+      implicit instructions: mutable.ListBuffer[Instruction], printTable: Map[(Int, Int), Type]
   ): CodeGeneratorState = {
     var newCodeGenState = codeGenState
 
@@ -630,9 +692,8 @@ object CodeGenerator {
     newCodeGenState
   }
 
-  def compileStatWithNewScope(statNode: Stat, codeGenState: CodeGeneratorState)(
-      implicit instructions: mutable.ListBuffer[Instruction]
-  ): CodeGeneratorState = {
+  def compileStatWithNewScope(statNode: Stat, codeGenState: CodeGeneratorState)
+                             (implicit instructions: mutable.ListBuffer[Instruction], printTable: Map[(Int, Int), Type]): CodeGeneratorState = {
     val newCodeGenState = compileStat(statNode, codeGenState)
     newCodeGenState
   }

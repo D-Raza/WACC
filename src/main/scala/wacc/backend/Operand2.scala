@@ -51,3 +51,7 @@ case class ImmChar(char: Char) extends Operand2 {
 case class LoadImmVal(value: Int) extends Operand2 {
   override def toString: String = s"=$value"
 }
+
+case class LabelOp(value: String) extends Operand2 {
+  override def toString = s"=$value"
+}

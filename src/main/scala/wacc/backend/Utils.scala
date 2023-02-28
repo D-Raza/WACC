@@ -1,9 +1,39 @@
 package wacc.backend
-import wacc.backend.Globals.{PAIR_SIZE, WORD_SIZE}
+import wacc.backend._
+import wacc.backend.Globals.WORD_SIZE
 
 import scala.collection.mutable
 
 object Utils {
+
+    var printStringFlag = false
+    var printIntFlag = false
+    var printCharFlag = false
+    var printBoolFlag = false
+    var printlnFlag = false 
+    var printRefFlag = false 
+
+
+     def addUtils()(implicit instructions: mutable.ListBuffer[Instruction]): Unit = {
+        if (printStringFlag) {
+            printString()
+        }
+        if (printIntFlag) {
+            printInt()
+        }
+        if (printCharFlag) {
+            printChar()
+        }
+        if (printBoolFlag) {
+            printBool()
+        }
+        if (printlnFlag) {
+            printLine()
+        }
+        if (printRefFlag) {
+            printRef()
+        }
+    }
 
     def printString()(implicit instructions: mutable.ListBuffer[Instruction]): Unit = {
         val stringDataFormat = "%.*s\u0000"
@@ -13,6 +43,7 @@ object Utils {
                 Push(List(LR)),
                 Load(R1, R0),
                 AddInstr(R2, R0, ImmVal(WORD_SIZE)),
+                Load(R0, LabelOp(Labels.addDataMsg(stringDataFormat))),
                 // TODO: Add string data format to data label
                 BranchAndLink("printf"),
                 Move(R0, ImmVal(0)),
@@ -29,7 +60,7 @@ object Utils {
                 Label("p_print_int"),
                 Push(List(LR)),
                 Move(R1, R0),
-                // add int data format to data label
+                Load(R0, LabelOp(Labels.addDataMsg(intDataFormat))),
                 BranchAndLink("printf"),
                 Move(R0, ImmVal(0)),
                 BranchAndLink("fflush"),
@@ -52,4 +83,38 @@ object Utils {
     def printBool()(implicit instructions: mutable.ListBuffer[Instruction]): Unit = {
 
     }
+
+
+
+    private def printLine()(implicit instructions: mutable.ListBuffer[Instruction]): Unit = {
+        instructions.addAll(
+            List(
+                Label("p_print_ln"),
+                Push(List(LR)),
+                Load(R0, LabelOp(Labels.addDataMsg("\n"))),
+                BranchAndLink("putchar"),
+                Pop(List(PC))
+            )
+        )
+    }
+
+    def printRef()(implicit instructions: mutable.Buffer[Instruction]): Unit = {
+        instructions.addAll(
+            List(
+                Label("p_print_reference"),
+                Push(List(LR)),
+                Move(R1, R0),
+                Load(R0, LabelOp(Labels.addDataMsg("%p\u0000"))),
+
+                AddInstr(R0, R0, ImmVal(WORD_SIZE)),
+                BranchAndLink("printf"),
+                Move(R0, ImmVal(0)),
+                BranchAndLink("fflush"),
+                Pop(List(PC))
+            )
+        )
+    } 
+
+
+   
 }

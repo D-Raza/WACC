@@ -181,7 +181,10 @@ object AST {
   sealed trait PairLiter extends Expr
 
   /* Case Classes and Traits */
-  case class Program(funcs: List[Func], stat: List[Stat])(val pos: (Int, Int))
+  case class Program(funcs: List[Func], stat: List[Stat])(val pos: (Int, Int)) {
+    val symbolTable: Map[Ident, Type] = Map.empty
+    val printTable: Map[(Int, Int), Type] = Map.empty
+  }
 
   case class Func(
       ty: Type,
