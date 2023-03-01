@@ -2,10 +2,31 @@ package wacc.backend
 
 import scala.collection.mutable
 
-object Labels {
+class Labels(var fname: String = "") {
+
+  def Labels(fname: String) = {
+    this.fname = fname
+  }
+
+  def addLabelInstructions(
+      instructions: mutable.ListBuffer[Instruction]
+  ): Unit = {
+
+    Label(fname) +=: instructions
+
+    if (fname == "main")
+      Directive("global main") +=: instructions
+
+    Directive("text") +=: instructions
+
+    if (dataMap.nonEmpty)
+      dataMap.flatMap(kv => kv._2.instruction) ++=: instructions
+
+    Directive("data") +=: instructions
+  }
 
   case class Data(s: String, labelIndex: String, actualSize: Int) {
-    val label: String = s".msg_$labelIndex"
+    val label: String = s".L._${fname}_str_$labelIndex"
     val instruction: mutable.ListBuffer[Instruction] =
       mutable.ListBuffer(
         Directive(s"    word $actualSize"),
@@ -13,6 +34,7 @@ object Labels {
         Directive(s"    asciz " + "\"" + s + "\"")
       )
   }
+
   val dataMap: mutable.LinkedHashMap[String, Data] =
     mutable.LinkedHashMap().empty
   private var dataCnt = 0
@@ -22,9 +44,6 @@ object Labels {
     dataCnt += 1
     result
   }
-
-  // .L_printb0_str0 (false)
-  // .L_printb0_str1 (true)
 
   private def addDataMsgWithLabel(s: String, label: String): String = {
     // Get the real length of the string before additional escape chars are added

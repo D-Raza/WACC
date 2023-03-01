@@ -115,6 +115,12 @@ case class Store(srcReg: Register, dest: Operand2, cond: Condition = AL)
   override def opsToString: String = s"$srcReg, $dest"
 }
 
+case class StoreByte(srcReg: Register, dest: Operand2, cond: Condition = AL)
+    extends Instruction {
+  override val opcode = "strb"
+  override def opsToString: String = s"$srcReg, $dest"
+}
+
 case class Load(destReg: Register, operand: Operand2, cond: Condition = AL)
     extends Instruction {
   override val opcode = "ldr"
@@ -152,6 +158,12 @@ case class Directive(directiveType: String) extends Instruction {
       case (prefix, suffix) => prefix.mkString + "." + suffix.mkString
     }
   }
+}
+
+case class Comment(comment: String) extends Instruction {
+  override def opsToString: String = ""
+  val opcode = ""
+  override def toString = "@ " + comment
 }
 
 // Branch instructions

@@ -222,7 +222,8 @@ object AST {
   case class If(cond: Expr, thenStat: List[Stat], elseStat: List[Stat])(
       val pos: (Int, Int)
   ) extends Stat {
-    var symbolTable: Map[Ident, Type] = Map.empty
+    var thenSymbolTable: Map[Ident, Type] = Map.empty
+    var elseSymbolTable: Map[Ident, Type] = Map.empty
   }
 
   case class While(cond: Expr, doStat: List[Stat])(val pos: (Int, Int))

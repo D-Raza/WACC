@@ -10,7 +10,7 @@ import java.io.{File, PrintWriter}
 import scala.io.Source
 import scala.collection.mutable
 import wacc.backend.CodeGenerator
-import wacc.backend.CodeGeneratorState
+import wacc.backend.CodeGenState
 
 object Compiler {
   val DEBUG = true
@@ -75,7 +75,8 @@ object Compiler {
 
           println("Assembling...")
           implicit val instructions = mutable.ListBuffer[Instruction]()
-          CodeGenerator.compileProgram(x, CodeGeneratorState())
+          implicit val state = CodeGenState()
+          instructions ++= CodeGenerator.compileProgram(x)
 
           if (DEBUG) {
             println("Instructions:")

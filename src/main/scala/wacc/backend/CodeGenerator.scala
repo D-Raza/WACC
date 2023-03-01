@@ -3,512 +3,143 @@ package wacc.backend
 import wacc.AST._
 import wacc.backend.Globals.{PAIR_SIZE, WORD_SIZE}
 import wacc.backend.Utils
-
 import scala.collection.mutable
 
 object CodeGenerator {
-  // Compiles the program
-  def compileProgram(programNode: Program, codeGenState: CodeGeneratorState)(
-      implicit instructions: mutable.ListBuffer[Instruction]
-  ): CodeGeneratorState = {
-    var newCodeGenState = codeGenState
+  def compileProgram(
+      programNode: Program
+  )(implicit state: CodeGenState): mutable.ListBuffer[Instruction] = {
+    val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
-    // Compiles each function declaration in the program
-    programNode.funcs.foreach(func =>
-      newCodeGenState = newCodeGenState.addFunctionName(func.ident.name)
-    )
+    programNode.funcs.foreach(func => {
+      implicit val printTable: Map[(Int, Int), Type] = func.printTable
+      implicit val symbolTable: Map[Ident, Type] = func.symbolTable
+      implicit val funcLabels = new Labels(func.ident.name)
+      instructions ++= compileFunc(func)
+    })
 
     implicit val printTable: Map[(Int, Int), Type] = programNode.printTable
-    programNode.funcs.foreach(func => compileFunc(func, newCodeGenState))
+    implicit val symbolTable: Map[Ident, Type] = programNode.symbolTable
+    implicit val mainLabels = new Labels("main")
 
-    instructions.addAll(
-      List(
-        Directive("global main"),
-        Label("main"),
-        Push(List(FP, LR)),
-        Push(List(R4, R5, R6, R7, R8, R10, IP)),
-        Move(FP, SP)
-      )
-    )
+    // instructions ++= List(
+    //   Label("main")
+    //   Push(List(FP, LR)),
+    //   Push(List(R4, R5, R6, R7, R8, R10, IP)),
+    //   Move(FP, SP)
+    // )
 
-    newCodeGenState = newCodeGenState.copy(stackPointerOffset =
-      newCodeGenState.stackPointerOffset + 4
-    )
+    instructions ++= StackMachine.addStackFrame(programNode.symbolTable)
 
-    val stackIdx = instructions.length
+    instructions ++= compileStats(programNode.stat)
 
-    // Compiles each statement in the program
-    programNode.stat.foreach(stat =>
-      newCodeGenState = compileStat(stat, newCodeGenState)
-    )
+    // instructions ++= List(
+    //   Move(R0, ImmVal(0)), // Set exit code as zero
+    //   Pop(List(R4, R5, R6, R7, R8, R10, IP)),
+    //   Pop(List(FP, PC))
+    // )
 
-    // add sp, sp, usedStackSize
-    if (newCodeGenState.usedStackSize > 0) {
-      instructions.insert(
-        stackIdx,
-        SubInstr(SP, SP, ImmVal(newCodeGenState.usedStackSize))
-      )
-      instructions.addOne(
-        AddInstr(SP, SP, ImmVal(newCodeGenState.usedStackSize))
-      )
-    }
-
-    // Set exit code as 0
-    instructions.addOne(Move(R0, ImmVal(0)))
-
-    instructions.addAll(
-      List(
-        Pop(List(R4, R5, R6, R7, R8, R10, IP)),
-        Pop(List(FP, PC))
-      )
-    )
-
-    println(newCodeGenState.identToReg)
+    instructions += Move(R0, ImmVal(0))
+    instructions ++= StackMachine.removeStackFrame()
+    instructions += Pop(List(PC))
 
     Utils.addUtils()(instructions)
+    mainLabels.addLabelInstructions(instructions)
 
-    val data = Labels.dataMap
-    if (data.nonEmpty) {
-      Directive("text") +=: instructions
-      data.flatMap(kv => kv._2.instruction) ++=: instructions
-      Directive("data") +=: instructions
-    }
-
-    var curOff = -newCodeGenState.usedStackSize
-    for (kv <- newCodeGenState.instructionIdxToSize) {
-      kv match {
-        case (idx, size) => {
-          instructions.update(idx, instructions(idx).putOnStack(curOff))
-          curOff += size
-        }
-      }
-    }
-
-    newCodeGenState.copy(stackPointerOffset =
-      newCodeGenState.stackPointerOffset - 4
-    )
-
+    instructions
   }
 
-  // Compiles function declaration
-  def compileFunc(funcNode: Func, codeGenState: CodeGeneratorState)(implicit
-      instructions: mutable.ListBuffer[Instruction],
-      printTable: Map[(Int, Int), Type]
-  ): CodeGeneratorState = {
-    var newCodeGenState = codeGenState
+  def compileFunc(funcNode: Func)(implicit
+      state: CodeGenState,
+      printTable: Map[(Int, Int), Type],
+      symbolTable: Map[Ident, Type],
+      labels: Labels
+  ): mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
-    instructions.addAll(
-      List(
-        Push(List(FP, LR)),
-        Move(FP, SP)
-      )
-    )
+  def compileStats(stats: List[Stat])(implicit
+      state: CodeGenState,
+      printTable: Map[(Int, Int), Type],
+      symbolTable: Map[Ident, Type],
+      labels: Labels
+  ): mutable.ListBuffer[Instruction] = {
+    val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
-    // Compile each of the parameters in the function declaration
-    funcNode.paramList.foreach(param =>
-      newCodeGenState = compileParam(param, newCodeGenState)
-    )
+    stats.foreach(stat => {
+      instructions ++= compileStat(stat)
+      println(s"stat=$stat, identToReg=${state.identToReg}")
+    })
 
-    instructions.addAll(
-      List(
-        Label("wacc_" + funcNode.ident.name),
-        Push(List(LR))
-      )
-    )
-
-    newCodeGenState = newCodeGenState.copy(stackPointerOffset =
-      newCodeGenState.stackPointerOffset + 4
-    )
-
-    // Needed for restoring stack pointer after compiling the body of the function declaration
-    newCodeGenState =
-      newCodeGenState.copy(originalSP = newCodeGenState.stackPointerOffset)
-
-    // Compile each of the statements in the function declaration's body
-    funcNode.stats.foreach(stat =>
-      newCodeGenState = compileStat(stat, newCodeGenState)
-    )
-
-    newCodeGenState = newCodeGenState.copy(originalSP = 0)
-
-    instructions.addOne(Pop(List(FP)))
-
-    instructions.addAll(
-      List(
-        Pop(List(FP, PC)),
-        Directive("ltorg")
-      )
-    )
-
-    val newStackPointerOffset =
-      newCodeGenState.stackPointerOffset - newCodeGenState.usedStackSize - 4
-    codeGenState.copy(
-      usedStackSize = 0,
-      stackPointerOffset = newStackPointerOffset
-    )
+    instructions
   }
 
-  // Compiles function parameter
-  def compileParam(
-      paramNode: Param,
-      codeGenState: CodeGeneratorState
-  ): CodeGeneratorState = {
-    // TODO: Replace with codeGenState.instructionIdxToSize
+  def compileStat(stat: Stat)(implicit
+      state: CodeGenState,
+      printTable: Map[(Int, Int), Type],
+      symbolTable: Map[Ident, Type],
+      labels: Labels
+  ): mutable.ListBuffer[Instruction] = {
+    val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
+    stat match {
+      case Skip() => instructions
 
-    // val newIdentToOffset =
-    //   codeGenState.identToOffset + (paramNode.ident -> (paramNode.ty.size + codeGenState.stackPointerOffset))
-    val newUsedStackSize = codeGenState.usedStackSize + paramNode.ty.size
-    val newStackPointerOffset =
-      codeGenState.stackPointerOffset + paramNode.ty.size
-
-    codeGenState.copy(
-      // identToOffset = newIdentToOffset,
-      usedStackSize = newUsedStackSize,
-      stackPointerOffset = newStackPointerOffset
-    )
-  }
-
-  // Compiles function call
-  def compileFunctionCall(funcCallNode: Call, codeGenState: CodeGeneratorState)(
-      implicit instructions: mutable.ListBuffer[Instruction]
-  ): CodeGeneratorState = {
-    var newCodeGenState = codeGenState
-    val argsSize =
-      funcCallNode.args.foldLeft(0)((sum: Int, expr: Expr) => sum + expr.size)
-    val resReg = R0
-
-    // Compile each of the arguments
-    funcCallNode.args.foreach(arg =>
-      newCodeGenState = compileExpression(arg, newCodeGenState)
-    )
-
-    instructions += BranchAndLink("wacc_" + funcCallNode.x.name)
-
-    if (argsSize > 0) {
-      instructions.addAll(
-        List(
-          // Set the stack pointer back to its original value
-          AddInstr(SP, SP, ImmVal(argsSize))
-        )
-      )
-    }
-
-    instructions.addAll(
-      List(
-        // Move result to result register
-        Move(resReg, R0)
-      )
-    )
-
-    newCodeGenState.copy(
-      stackPointerOffset = newCodeGenState.stackPointerOffset - argsSize
-    )
-  }
-
-  // Compiles expression
-  def compileExpression(exprNode: Expr, codeGenState: CodeGeneratorState)(
-      implicit instructions: mutable.ListBuffer[Instruction]
-  ): CodeGeneratorState = {
-    var newCodeGenState = codeGenState
-    val resReg = newCodeGenState.tmp
-    val operand1Reg = newCodeGenState.fallbackReg
-
-    exprNode match {
-      case ident: Ident =>
-        newCodeGenState = compileIdent(ident, newCodeGenState)
-
-      // Case for binary expressions
-      case Add(_, _) | Sub(_, _) | Mult(_, _) | Div(_, _) | Mod(_, _) |
-          And(_, _) | Or(_, _) | LT(_, _) | LTE(_, _) | GT(_, _) | GTE(_, _) |
-          Equal(_, _) | NotEqual(_, _) => {
-        val operand2Reg = newCodeGenState.fallbackReg2
-        // newCodeGenState.getScratchReg match {
-        //   case Some(reg) => reg
-        //   case None      => {
-        //                   instructions.addOne(Push(List(newCodeGenState.fallbackReg2)))
-        //                   newCodeGenState.fallbackReg2
-        //               }
-        // }
-
-        /* Compile the first and second expression in the binary expression,
-           and add the corresponding instructions needed to instructions list */
-        exprNode match {
-          // TODO: Overflow
-          case Mult(x, y) =>
-            newCodeGenState = compileExpression(x, newCodeGenState)
-            newCodeGenState = compileExpression(y, newCodeGenState)
-            instructions += SMull(
-              operand1Reg,
-              operand2Reg,
-              operand1Reg,
-              operand2Reg
+      case Declare(ty, ident, rValue) => {
+        state.getScratchReg match {
+          case Some(scratchReg) => {
+            instructions ++= compileRValue(rValue, scratchReg)
+            state.identToReg += (ident -> scratchReg)
+          }
+          case None => {
+            StackMachine.addDeclaration(ident, ty.size)
+            instructions ++= compileRValue(rValue, state.tmp)
+            instructions += storeRes(
+              StackMachine.getIdentOffset(ident),
+              ty.size,
+              state.tmp
             )
-
-          // TODO
-          case Div(x, y) =>
-            newCodeGenState = compileExpression(x, newCodeGenState)
-            newCodeGenState = compileExpression(y, newCodeGenState)
-            instructions.addAll(
-              List(
-                BranchAndLink(
-                  "__aeabi_idiv"
-                ), // signed __aeabi_idiv(signed numerator, signed denominator)
-                Move(resReg, R0)
-              )
-            )
-
-          // TODO
-          case Mod(x, y) =>
-            newCodeGenState = compileExpression(x, newCodeGenState)
-            newCodeGenState = compileExpression(y, newCodeGenState)
-            instructions.addAll(
-              List(
-                BranchAndLink(
-                  "__aeabi_idivmod"
-                ), // signed __aeabi_idivmod(signed numerator, signed denominator)
-                Move(resReg, R1)
-              )
-            )
-
-          case Add(x, y) =>
-            newCodeGenState = compileExpression(x, newCodeGenState)
-            newCodeGenState = compileExpression(y, newCodeGenState)
-            instructions += AddInstr(resReg, operand1Reg, operand2Reg)
-
-          case And(x, y) =>
-            newCodeGenState = compileExpression(x, newCodeGenState)
-            newCodeGenState = compileExpression(y, newCodeGenState)
-            instructions += AndInstr(resReg, operand1Reg, operand2Reg)
-
-          case Or(x, y) =>
-            newCodeGenState = compileExpression(x, newCodeGenState)
-            newCodeGenState = compileExpression(y, newCodeGenState)
-            instructions += OrrInstr(resReg, operand1Reg, operand2Reg)
-
-          case Sub(x, y) =>
-            newCodeGenState = compileExpression(x, newCodeGenState)
-            newCodeGenState = compileExpression(y, newCodeGenState)
-            instructions += SubInstr(resReg, operand1Reg, operand2Reg)
-
-          case LT(x, y) =>
-            newCodeGenState = compileExpression(x, newCodeGenState)
-            newCodeGenState = compileExpression(y, newCodeGenState)
-            instructions.addAll(
-              List(
-                Cmp(operand1Reg, operand2Reg),
-                Move(resReg, ImmVal(1), Condition.LT),
-                Move(resReg, ImmVal(0), Condition.GE)
-              )
-            )
-
-          case LTE(x, y) =>
-            newCodeGenState = compileExpression(x, newCodeGenState)
-            newCodeGenState = compileExpression(y, newCodeGenState)
-            instructions.addAll(
-              List(
-                Cmp(operand1Reg, operand2Reg),
-                Move(resReg, ImmVal(1), Condition.LE),
-                Move(resReg, ImmVal(0), Condition.GT)
-              )
-            )
-
-          case GT(x, y) =>
-            newCodeGenState = compileExpression(x, newCodeGenState)
-            newCodeGenState = compileExpression(y, newCodeGenState)
-            instructions.addAll(
-              List(
-                Cmp(operand1Reg, operand2Reg),
-                Move(resReg, ImmVal(1), Condition.GT),
-                Move(resReg, ImmVal(0), Condition.LE)
-              )
-            )
-
-          case GTE(x, y) =>
-            newCodeGenState = compileExpression(x, newCodeGenState)
-            newCodeGenState = compileExpression(y, newCodeGenState)
-            instructions.addAll(
-              List(
-                Cmp(operand1Reg, operand2Reg),
-                Move(resReg, ImmVal(1), Condition.GE),
-                Move(resReg, ImmVal(0), Condition.LT)
-              )
-            )
-
-          case NotEqual(x, y) =>
-            newCodeGenState = compileExpression(x, newCodeGenState)
-            newCodeGenState = compileExpression(y, newCodeGenState)
-            instructions.addAll(
-              List(
-                Cmp(operand1Reg, operand2Reg),
-                Move(resReg, ImmVal(1), Condition.NE),
-                Move(resReg, ImmVal(0), Condition.EQ)
-              )
-            )
-
-          case Equal(x, y) =>
-            newCodeGenState = compileExpression(x, newCodeGenState)
-            newCodeGenState = compileExpression(y, newCodeGenState)
-            instructions.addAll(
-              List(
-                Cmp(operand1Reg, operand2Reg),
-                Move(resReg, ImmVal(1), Condition.EQ),
-                Move(resReg, ImmVal(0), Condition.NE)
-              )
-            )
-
-          case _ => ()
-        }
-        instructions.addOne(Pop(List(newCodeGenState.fallbackReg)))
-      }
-
-      // Case for unary expressions
-      case Not(_) | Neg(_) | Len(_) | Ord(_) | Chr(_) | Ident(_) => {
-        /* Compile the first expression in the unary expression,
-         and add add the corresponding instructions needed to instructions list */
-        exprNode match {
-          case Not(x) =>
-            newCodeGenState = compileExpression(x, newCodeGenState)
-            instructions += XorInstr(resReg, resReg, ImmVal(1))
-
-          case Neg(x) =>
-            newCodeGenState = compileExpression(x, newCodeGenState)
-            instructions += Rsb(resReg, resReg, ImmVal(0))
-
-          case Len(x) =>
-            newCodeGenState = compileExpression(x, newCodeGenState)
-            instructions += Load(resReg, OffsetMode(resReg))
-
-          case Ord(x) =>
-            newCodeGenState = compileExpression(x, newCodeGenState)
-
-          case Chr(x) =>
-            newCodeGenState = compileExpression(x, newCodeGenState)
-
-          case _ => ()
-        }
-      }
-
-      // Case for expression literals
-      case IntegerLiter(_) | BoolLiter(_) | CharLiter(_) | StrLiter(_) |
-          Null() => {
-        exprNode match {
-          case IntegerLiter(x) =>
-            instructions += Move(codeGenState.tmp, ImmVal(x))
-
-          case BoolLiter(x) =>
-            instructions += Move(codeGenState.tmp, ImmVal(if (x) 1 else 0))
-
-          case CharLiter(x) =>
-            instructions += Move(codeGenState.tmp, ImmChar(x))
-
-          case StrLiter(x) =>
-            instructions += Load(
-              codeGenState.tmp,
-              LabelOp(Labels.addDataMsg(x))
-            )
-
-          case Null() =>
-            instructions += Move(codeGenState.tmp, ImmVal(0))
-
-          case _ => ()
-        }
-      }
-
-      case _ => ()
-    }
-
-    newCodeGenState
-  }
-
-  def compileStat(statNode: Stat, codeGenState: CodeGeneratorState)(implicit
-      instructions: mutable.ListBuffer[Instruction],
-      printTable: Map[(Int, Int), Type]
-  ): CodeGeneratorState = {
-    var newCodeGenState = codeGenState
-
-    statNode match {
-      case Skip() =>
-        newCodeGenState
-
-      case Assign(lValue, rValue) => {
-        newCodeGenState = compileRValue(rValue, newCodeGenState)
-        newCodeGenState = compileLValue(lValue, newCodeGenState)
-        
-        instructions += Store(
-          newCodeGenState.getScratchReg.get,
-          OffsetMode(newCodeGenState.getScratchReg.get) //str r7
-        )
-      }
-
-      case Declare(ty, x, y) =>
-        {
-          newCodeGenState = compileRValue(y, newCodeGenState)
-
-          newCodeGenState.getScratchReg match {
-            case Some(reg) => {
-              instructions += Move(reg, newCodeGenState.tmp)
-              newCodeGenState = newCodeGenState.copy(identToReg =
-                newCodeGenState.identToReg + (x -> reg)
-              )
-            }
-            case None => {
-              // TODO: verify that this is correct
-              instructions += Store(
-                newCodeGenState.tmp,
-                OffsetMode(FP, shiftAmount = ImmVal(ty.size))
-              )
-
-              newCodeGenState = newCodeGenState.copy(
-                usedStackSize = newCodeGenState.usedStackSize + ty.size,
-                instructionIdxToSize = newCodeGenState.instructionIdxToSize
-                  .addOne(instructions.length, ty.size)
-              )
-            }
           }
         }
 
-      case Read(_) =>
-      // TODO
+        // StackMachine.addDeclaration(ident, ty.size)
+        // instructions ++= compileRValue(rValue, state.tmp)
+        // instructions += storeRes(
+        //   StackMachine.getIdentOffset(ident),
+        //   ty.size,
+        //   state.tmp
+        // )
+      }
 
-      case Free(_) =>
-      // TODO
+      case Assign(lValue, rValue) => {
+        instructions += Comment(s"ASSIGN $lValue = $rValue, LHS")
+        instructions ++= compileRValue(rValue, state.tmp2)
+        instructions += Comment(s"ASSIGN $lValue = $rValue, RHS")
+        instructions ++= compileLValue(lValue, state.tmp)
 
-      case Return(expr) =>
-        val resReg = R0
-        newCodeGenState = compileExpression(expr, newCodeGenState)
+        instructions += Comment(s"ASSIGN MOVE")
+        instructions += Move(state.tmp, state.tmp2)
 
-        if (resReg != R0)
-          instructions += Move(R0, resReg)
+        // instructions += Store(
+        //    state.getScratchReg.get,
+        //    OffsetMode(state.getScratchReg.get))
+      }
 
-        val stackPointerOffsetDiff =
-          newCodeGenState.stackPointerOffset - newCodeGenState.originalSP
-        if (stackPointerOffsetDiff > 0) {
-          instructions += AddInstr(
-            SP,
-            SP,
-            ImmVal(stackPointerOffsetDiff)
-          )
-        }
+      case Read(_) => () // TODO
 
-        newCodeGenState = newCodeGenState.copy(
-          stackPointerOffset = newCodeGenState.originalSP
-        )
+      case Free(_) => () // TODO
 
-      case Exit(expr) =>
-        newCodeGenState = compileExpression(expr, newCodeGenState)
-        instructions += Move(R0, newCodeGenState.tmp)
+      case Return(expr) => instructions ++= compileExpr(expr, R0)
+
+      case Exit(expr) => {
+        instructions ++= compileExpr(expr, R0)
         instructions += BranchAndLink("exit")
+      }
 
-        newCodeGenState = newCodeGenState.copy()
-
-      case Print(expr) =>
-        newCodeGenState = compileExpression(expr, newCodeGenState)
-        instructions += Move(R0, newCodeGenState.tmp)
+      case Print(expr) => {
+        instructions ++= compileExpr(expr, R0)
         printTable.get(expr.pos) match {
           case Some(IntType()) =>
             if (!Utils.printIntFlag) {
               Utils.printIntFlag = true
-              Labels.addDataMsg("%d\u0000")
+              labels.addDataMsg("%d\u0000")
             }
             instructions += BranchAndLink("_printi")
           case Some(CharType()) =>
@@ -523,17 +154,18 @@ object CodeGenerator {
             if (!Utils.printBoolFlag)
               Utils.printBoolFlag = true
             instructions += BranchAndLink("_printb")
-          case _ => ()
+          case _ => mutable.ListBuffer.empty
         }
+      }
 
-      case Println(expr) =>
-        newCodeGenState = compileExpression(expr, newCodeGenState)
-        instructions += Move(R0, newCodeGenState.tmp)
+      case Println(expr) => {
+        instructions += Comment(s"PRINTLN $expr")
+        instructions ++= compileExpr(expr, R0)
         printTable.get(expr.pos) match {
           case Some(IntType()) =>
             if (!Utils.printIntFlag) {
               Utils.printIntFlag = true
-              Labels.addDataMsg("%d\u0000")
+              labels.addDataMsg("%d\u0000")
             }
             instructions += BranchAndLink("_printi")
           case Some(CharType()) =>
@@ -548,33 +180,33 @@ object CodeGenerator {
           case Some(BoolType()) =>
             if (!Utils.printBoolFlag) {
               Utils.printBoolFlag = true
-              Labels.addDataMsg("false\u0000")
-              Labels.addDataMsg("true\u0000")
+              labels.addDataMsg("false\u0000")
+              labels.addDataMsg("true\u0000")
             }
             instructions += BranchAndLink("_printb")
           case _ => ()
         }
         Utils.printlnFlag = true
         instructions += BranchAndLink("_println")
+      }
 
       case ifStatNode @ If(_, _, _) =>
-        newCodeGenState = compileIfStat(ifStatNode, newCodeGenState)
+        instructions ++= compileIfStat(ifStatNode, state.tmp)
 
-      case While(cond, bodyStat) =>
-        val uniqueWhileName = "while_" + codeGenState.getNewLabelId;
+      case whileNode @ While(cond, bodyStat) => {
+        val uniqueWhileName = "while_" + state.getNewLabelId;
         val condLabel = uniqueWhileName + "_cond"
         val bodyLabel = uniqueWhileName + "_body"
         instructions += Branch(condLabel)
 
         instructions += Label(bodyLabel)
-        bodyStat.foreach(stat =>
-          newCodeGenState = compileStatWithNewScope(stat, newCodeGenState)
-        )
+        StackMachine.addStackFrame(whileNode.symbolTable)
+        bodyStat.foreach(stat => instructions ++= compileStat(stat))
 
-        val condReg = newCodeGenState.getScratchReg.get
+        val condReg = state.getScratchReg.get
 
         instructions += Label(condLabel)
-        newCodeGenState = compileExpression(cond, newCodeGenState)
+        instructions ++= compileExpr(cond, state.tmp)
 
         instructions.addAll(
           List(
@@ -582,70 +214,38 @@ object CodeGenerator {
             Branch(bodyLabel, Condition.EQ)
           )
         )
+      }
 
-      case Scope(stats) =>
-        stats.foreach(stat =>
-          newCodeGenState = compileStatWithNewScope(stat, newCodeGenState)
-        ) // TODO - implement compileBlock or similar
+      case scopeNode @ Scope(stats) => {
+        StackMachine.addStackFrame(scopeNode.symbolTable)
+        stats.foreach(stat => instructions ++= compileStat(stat))
+        // TODO - implement compileBlock or similar
+      }
     }
-
-    newCodeGenState
+    instructions
   }
 
-  // Compiles 'if-then-else' statements
-  def compileIfStat(ifNode: If, codeGenState: CodeGeneratorState)(implicit
-      instructions: mutable.ListBuffer[Instruction],
-      printTable: Map[(Int, Int), Type]
-  ): CodeGeneratorState = {
-    val condReg = codeGenState.getScratchReg.get
+  def compileRValue(rValue: RValue, resReg: Register)(implicit
+      state: CodeGenState,
+      printTable: Map[(Int, Int), Type],
+      symbolTable: Map[Ident, Type],
+      labels: Labels
+  ): mutable.ListBuffer[Instruction] = {
+    val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
-    // Compile condition
-    var newCodeGenState = compileExpression(ifNode.cond, codeGenState)
+    rValue match {
+      // case ArrayLit(xs) => {
+      //   if (xs.length != 0) {
+      //     val arrayItemSize = xs.head.size
+      //     val arraySize = xs.head.size * xs.length
+      //   }
+      // }
 
-    val thenLabel = "l_" + newCodeGenState.getNewLabelId
-    val endLabel = "l_" + newCodeGenState.getNewLabelId
-
-    instructions.addAll(
-      List(
-        Cmp(condReg, ImmVal(1)),
-        Branch(thenLabel, Condition.EQ)
-      )
-    )
-
-    // Compile else statement
-    ifNode.elseStat.foreach(stat =>
-      newCodeGenState = compileStatWithNewScope(stat, newCodeGenState)
-    )
-
-    instructions.addAll(
-      List(
-        Branch(endLabel),
-        Label(thenLabel)
-      )
-    )
-
-    // Compile then statement
-    ifNode.thenStat.foreach(stat =>
-      newCodeGenState = compileStatWithNewScope(stat, newCodeGenState)
-    )
-
-    instructions += Label(endLabel)
-
-    newCodeGenState
-  }
-
-  def compileRValue(rValueNode: RValue, codeGenState: CodeGeneratorState)(
-      implicit instructions: mutable.ListBuffer[Instruction]
-  ): CodeGeneratorState = {
-    var newCodeGenState = codeGenState
-
-    rValueNode match {
       case ArrayLit(xs) =>
-         if (xs.length != 0) {
+        if (xs.length != 0) {
           val arrayItemSize = xs.head.size
           val arraySize = xs.head.size * xs.length
-          val tmp = R8
-          val arrayStartReg: Register = newCodeGenState.getScratchReg.get
+          val arrayStartReg: Register = state.getScratchReg.get
 
           instructions.addAll(
             List(
@@ -653,64 +253,60 @@ object CodeGenerator {
               BranchAndLink("malloc"),
               Move(arrayStartReg, R0),
               AddInstr(arrayStartReg, arrayStartReg, ImmVal(WORD_SIZE)),
-              Move(tmp, ImmVal(xs.length)),
-              Store(tmp, OffsetMode(arrayStartReg, shiftAmount = ImmVal(-4)))
+              Move(state.tmp, ImmVal(xs.length)),
+              Store(
+                state.tmp,
+                OffsetMode(arrayStartReg, shiftAmount = ImmVal(-4))
+              )
             )
           )
 
           for ((expr, i) <- xs.zipWithIndex) {
-            newCodeGenState = compileExpression(expr, newCodeGenState)
+            instructions ++= compileExpr(expr, state.tmp)
             instructions += Store(
-              tmp,
+              state.tmp,
               OffsetMode(arrayStartReg, shiftAmount = ImmVal(arrayItemSize * i))
             )
           }
 
-          instructions.addAll(
-            List(
-              Move(tmp, arrayStartReg),
-              Move(IP, tmp)
-            )
-          )
+          instructions += Move(resReg, arrayStartReg)
         }
 
-
-      case NewPair(fst, snd) =>
-        newCodeGenState = compileNewPair(fst, snd, newCodeGenState)
-
+      case NewPair(fst, snd) => instructions ++= compileNewPair(fst, snd)
       case Call(_, _) =>
-        newCodeGenState =
-          compileFunctionCall(rValueNode.asInstanceOf[Call], newCodeGenState)
-
-      case expr: Expr =>
-        newCodeGenState = compileExpression(expr, newCodeGenState)
-
+        instructions ++= compileFunctionCall(rValue.asInstanceOf[Call])
+      case expr: Expr  => instructions ++= compileExpr(expr, resReg)
       case _: PairElem =>
-      // TODO
     }
 
-    newCodeGenState
+    instructions
   }
 
-def compileLValue(lValueNode: LValue, codeGenState: CodeGeneratorState)(
-      implicit instructions: mutable.ListBuffer[Instruction]
-  ): CodeGeneratorState = {
-    var newCodeGenState = codeGenState
-    lValueNode match {
-      case ident: Ident =>
-        newCodeGenState = compileIdent(ident, newCodeGenState)
+  def compileLValue(lValue: LValue, resReg: Register)(implicit
+      state: CodeGenState,
+      printTable: Map[(Int, Int), Type],
+      symbolTable: Map[Ident, Type],
+      labels: Labels
+  ): mutable.ListBuffer[Instruction] = {
+    val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
+
+    lValue match {
+      case ident: Ident => instructions ++= compileIdent(ident, resReg)
       case ArrayElem(ident: Ident, xs: List[Expr]) =>
         instructions.addAll(
           List(
             // R3 contains array pointer - THIS NEEDS TO BE CHECKED
-            Move(R3, ImmVal(0)),   // ImmVal(newCodeGenState.getIdentOffset(ident.name))),
+            Move(
+              R3,
+              ImmVal(0)
+            ), // ImmVal(newCodeGenState.getIdentOffset(ident.name))),
             // R7 contains rValue to be assigned
             Move(R7, R8)
           )
         )
-        
-        val indexReg = newCodeGenState.getScratchReg.get
-        newCodeGenState = compileExpression(xs.head, newCodeGenState)
+
+        val indexReg = state.getScratchReg.get
+        instructions ++= compileExpr(xs.head, indexReg)
         // R10 contains index value
 
         instructions.addAll(
@@ -720,10 +316,9 @@ def compileLValue(lValueNode: LValue, codeGenState: CodeGeneratorState)(
           )
         )
 
-
         instructions.addAll(
           List(
-            /* @ Special calling convention: array ptr passed in R3, index in R10, 
+            /* @ Special calling convention: array ptr passed in R3, index in R10,
                value to store in R7, LR (R14) is used as general register */
             Label("_arrStore"),
             Push(List(LR)),
@@ -734,58 +329,373 @@ def compileLValue(lValueNode: LValue, codeGenState: CodeGeneratorState)(
             Cmp(R10, LR),
             Move(R1, R10, Condition.GE),
             BranchAndLink("_boundsCheck", Condition.GE),
-            Store(newCodeGenState.tmp, OffsetMode(baseReg = R3, auxReg = Some(R10), shiftType = Some(ShiftType.LSL), shiftAmount = ImmVal(2)))
+            Store(
+              state.tmp,
+              OffsetMode(
+                baseReg = R3,
+                auxReg = Some(R10),
+                shiftType = Some(ShiftType.LSL),
+                shiftAmount = ImmVal(2)
+              )
+            )
           )
         )
 
-      case _: PairElem     => // TODO
+      case _: PairElem => // TODO
     }
-    newCodeGenState
+    instructions
   }
 
-  private def compileIdent(ident: Ident, codeGenState: CodeGeneratorState)(
-      implicit instructions: mutable.ListBuffer[Instruction]
-  ): CodeGeneratorState = {
-    codeGenState.identToReg.get(ident) match {
-      case Some(reg) =>
-        instructions ++= List(
-          Move(codeGenState.tmp, reg)
+  def compileNewPair(fst: Expr, snd: Expr)(implicit
+      state: CodeGenState,
+      printTable: Map[(Int, Int), Type],
+      symbolTable: Map[Ident, Type],
+      labels: Labels
+  ): mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
+
+  def compileFunctionCall(funcCallNode: Call)(implicit
+      state: CodeGenState,
+      printTable: Map[(Int, Int), Type],
+      symbolTable: Map[Ident, Type],
+      labels: Labels
+  ): mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
+
+  def compileExpr(expr: Expr, resReg: Register)(implicit
+      state: CodeGenState,
+      printTable: Map[(Int, Int), Type],
+      symbolTable: Map[Ident, Type],
+      labels: Labels
+  ): mutable.ListBuffer[Instruction] = {
+    val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
+    val operand1Reg = state.tmp
+    val operand2Reg = state.tmp2
+
+    expr match {
+      case ident: Ident => instructions ++= compileIdent(ident, resReg)
+      // TODO: Overflow
+      case Mult(x, y) =>
+        instructions ++= compileExpr(x, operand1Reg)
+        instructions ++= compileExpr(y, operand2Reg)
+        instructions += SMull(
+          operand1Reg,
+          operand2Reg,
+          operand1Reg,
+          operand2Reg
         )
-      case None =>
-        // val offset = codeGenState.getIdentOffset(ident)
+
+      // TODO
+      case Div(x, y) =>
+        instructions ++= compileExpr(x, operand1Reg)
+        instructions ++= compileExpr(y, operand2Reg)
+        instructions.addAll(
+          List(
+            BranchAndLink(
+              "__aeabi_idiv"
+            ), // signed __aeabi_idiv(signed numerator, signed denominator)
+            Move(resReg, R0)
+          )
+        )
+
+      // TODO
+      case Mod(x, y) =>
+        instructions ++= compileExpr(x, operand1Reg)
+        instructions ++= compileExpr(y, operand2Reg)
+        instructions.addAll(
+          List(
+            BranchAndLink(
+              "__aeabi_idivmod"
+            ), // signed __aeabi_idivmod(signed numerator, signed denominator)
+            Move(resReg, R1)
+          )
+        )
+
+      case Add(x, y) =>
+        instructions ++= compileExpr(x, operand1Reg)
+        instructions ++= compileExpr(y, operand2Reg)
+        instructions += AddInstr(resReg, operand1Reg, operand2Reg)
+
+      case And(x, y) =>
+        instructions ++= compileExpr(x, operand1Reg)
+        instructions ++= compileExpr(y, operand2Reg)
+        instructions += AndInstr(resReg, operand1Reg, operand2Reg)
+
+      case Or(x, y) =>
+        instructions ++= compileExpr(x, operand1Reg)
+        instructions ++= compileExpr(y, operand2Reg)
+        instructions += OrrInstr(resReg, operand1Reg, operand2Reg)
+
+      case Sub(x, y) =>
+        instructions ++= compileExpr(x, operand1Reg)
+        instructions ++= compileExpr(y, operand2Reg)
+        instructions += SubInstr(resReg, operand1Reg, operand2Reg)
+
+      case LT(x, y) =>
+        instructions ++= compileExpr(x, operand1Reg)
+        instructions ++= compileExpr(y, operand2Reg)
+        instructions.addAll(
+          List(
+            Cmp(operand1Reg, operand2Reg),
+            Move(resReg, ImmVal(1), Condition.LT),
+            Move(resReg, ImmVal(0), Condition.GE)
+          )
+        )
+
+      case LTE(x, y) =>
+        instructions ++= compileExpr(x, operand1Reg)
+        instructions ++= compileExpr(y, operand2Reg)
+        instructions.addAll(
+          List(
+            Cmp(operand1Reg, operand2Reg),
+            Move(resReg, ImmVal(1), Condition.LE),
+            Move(resReg, ImmVal(0), Condition.GT)
+          )
+        )
+
+      case GT(x, y) =>
+        instructions ++= compileExpr(x, operand1Reg)
+        instructions ++= compileExpr(y, operand2Reg)
+        instructions.addAll(
+          List(
+            Cmp(operand1Reg, operand2Reg),
+            Move(resReg, ImmVal(1), Condition.GT),
+            Move(resReg, ImmVal(0), Condition.LE)
+          )
+        )
+
+      case GTE(x, y) =>
+        instructions ++= compileExpr(x, operand1Reg)
+        instructions ++= compileExpr(y, operand2Reg)
+        instructions.addAll(
+          List(
+            Cmp(operand1Reg, operand2Reg),
+            Move(resReg, ImmVal(1), Condition.GE),
+            Move(resReg, ImmVal(0), Condition.LT)
+          )
+        )
+
+      case NotEqual(x, y) =>
+        instructions ++= compileExpr(x, operand1Reg)
+        instructions ++= compileExpr(y, operand2Reg)
+        instructions.addAll(
+          List(
+            Cmp(operand1Reg, operand2Reg),
+            Move(resReg, ImmVal(1), Condition.NE),
+            Move(resReg, ImmVal(0), Condition.EQ)
+          )
+        )
+
+      case Equal(x, y) =>
+        instructions ++= compileExpr(x, operand1Reg)
+        instructions ++= compileExpr(y, operand2Reg)
+        instructions.addAll(
+          List(
+            Cmp(operand1Reg, operand2Reg),
+            // Move(R7, ImmVal(1), Condition.EQ),
+            // Move(R7, ImmVal(0), Condition.NE)
+            Move(resReg, ImmVal(1), Condition.EQ),
+            Move(resReg, ImmVal(0), Condition.NE)
+          )
+        )
+      // cmp r4, r5,		moveq r7, #1,  movne r7, #0
+
+      case Not(x) => {
+        instructions ++= compileExpr(x, resReg)
+        instructions += XorInstr(resReg, resReg, ImmVal(1))
+      }
+
+      case Neg(x) => {
+        instructions ++= compileExpr(x, resReg)
+        instructions += Rsb(resReg, resReg, ImmVal(0))
+      }
+
+      case Len(x) => {
+        instructions ++= compileExpr(x, resReg)
+        instructions += Load(resReg, OffsetMode(resReg))
+      }
+      case Ord(x) => instructions ++= compileExpr(x, resReg)
+
+      case Chr(x) => instructions ++= compileExpr(x, resReg)
+
+      case IntegerLiter(x) =>
+        instructions += Move(resReg, ImmVal(x))
+
+      case BoolLiter(x) => {
+        instructions += Move(resReg, ImmVal(if (x) 1 else 0))
+      }
+
+      case CharLiter(x) => {
+        instructions += Move(resReg, ImmChar(x))
+      }
+      case StrLiter(x) => {
         instructions += Load(
-          codeGenState.tmp,
-          OffsetMode(FP, shiftAmount = ImmVal(4))
+          resReg,
+          LabelOp(labels.addDataMsg(x))
         )
+      }
+      case Null() =>
+        instructions += Move(state.tmp, ImmVal(0))
+      case ArrayElem(ident: Ident, xs: List[Expr]) =>
+        instructions.addAll(
+          List(
+            // R3 contains array pointer - THIS NEEDS TO BE CHECKED
+            Move(
+              R3,
+              ImmVal(0)
+            ), // ImmVal(newCodeGenState.getIdentOffset(ident.name))),
+            // R7 contains rValue to be assigned
+            Move(R7, R8)
+          )
+        )
+
+        val indexReg = state.getScratchReg.get // TODO: Sort out
+        instructions ++= compileExpr(xs.head, indexReg)
+        // R10 contains index value
+
+        instructions.addAll(
+          List(
+            Move(R10, indexReg),
+            BranchAndLink("_arrStore")
+          )
+        )
+
+        instructions.addAll(
+          List(
+            /* @ Special calling convention: array ptr passed in R3, index in R10,
+               value to store in R7, LR (R14) is used as general register */
+            Label("_arrStore"),
+            Push(List(LR)),
+            Cmp(R10, ImmVal(0)),
+            Move(R1, R10, Condition.LT),
+            BranchAndLink("_boundsCheck", Condition.LT),
+            Load(LR, OffsetMode(baseReg = R3, shiftAmount = ImmVal(-4))),
+            Cmp(R10, LR),
+            Move(R1, R10, Condition.GE),
+            BranchAndLink("_boundsCheck", Condition.GE),
+            Store(
+              state.tmp,
+              OffsetMode(
+                baseReg = R3,
+                auxReg = Some(R10),
+                shiftType = Some(ShiftType.LSL),
+                shiftAmount = ImmVal(2)
+              )
+            )
+          )
+        )
+
+      case Bracket(x) => instructions ++= compileExpr(x, resReg)
     }
-    codeGenState
+    instructions
   }
 
-  def compileNewPair(fst: Expr, snd: Expr, codeGenState: CodeGeneratorState)(
-      implicit instructions: mutable.ListBuffer[Instruction]
-  ): CodeGeneratorState = {
-    var newCodeGenState = codeGenState
-    newCodeGenState = compileExpression(fst, newCodeGenState)
-    // need to add size of fst and snd somehow
-    newCodeGenState = compileExpression(snd, newCodeGenState)
+  def compileIfStat(ifNode: If, resReg: Register)(implicit
+      state: CodeGenState,
+      printTable: Map[(Int, Int), Type],
+      symbolTable: Map[Ident, Type],
+      labels: Labels
+  ): mutable.ListBuffer[Instruction] = {
+    val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
-    instructions ++ mutable.ListBuffer(
-      Load(R0, LoadImmVal(PAIR_SIZE)),
-      BranchAndLink("malloc"),
-      Pop(List(R2, R1)),
-      Store(R1, OffsetMode(R0)),
-      Store(R2, OffsetMode(R0, shiftAmount = ImmVal(WORD_SIZE)))
+    val condReg = state.tmp
+
+    // Compile condition
+    instructions ++= compileExpr(ifNode.cond, condReg)
+
+    val thenLabel = "l_" + state.getNewLabelId
+    val endLabel = "l_" + state.getNewLabelId
+
+    instructions.addAll(
+      List(
+        Cmp(condReg, ImmVal(1)),
+        Branch(thenLabel, Condition.EQ)
+      )
     )
 
-    newCodeGenState
+    // Compile else statement
+    // instructions ++= StackMachine.addStackFrame(ifNode.elseSymbolTable)
+    ifNode.elseStat.foreach(stat =>
+      instructions ++= compileStat(stat)(
+        state,
+        printTable,
+        ifNode.elseSymbolTable,
+        labels
+      )
+    )
+    // instructions ++= StackMachine.removeStackFrame()
+
+    instructions.addAll(
+      List(
+        Branch(endLabel),
+        Label(thenLabel)
+      )
+    )
+
+    // Compile then statement
+    // instructions ++= StackMachine.addStackFrame(ifNode.thenSymbolTable)
+    ifNode.thenStat.foreach(stat =>
+      instructions ++= compileStat(stat)(
+        state,
+        printTable,
+        ifNode.thenSymbolTable,
+        labels
+      )
+    )
+    // instructions ++= StackMachine.removeStackFrame()
+
+    instructions += Label(endLabel)
+
+    instructions
+
   }
 
-  def compileStatWithNewScope(statNode: Stat, codeGenState: CodeGeneratorState)(
-      implicit
-      instructions: mutable.ListBuffer[Instruction],
-      printTable: Map[(Int, Int), Type]
-  ): CodeGeneratorState = {
-    val newCodeGenState = compileStat(statNode, codeGenState)
-    newCodeGenState
+  def compileIdent(ident: Ident, resReg: Register)(implicit
+      state: CodeGenState,
+      printTable: Map[(Int, Int), Type],
+      symbolTable: Map[Ident, Type],
+      labels: Labels
+  ): mutable.ListBuffer[Instruction] = {
+    val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
+    state.identToReg.get(ident) match {
+      case Some(reg) =>
+        if (reg != resReg) {
+          instructions ++= List(
+            Move(resReg, reg)
+          )
+          state.identToReg += (ident -> resReg)
+        }
+      case None =>
+        instructions += Load(
+          state.tmp,
+          OffsetMode(
+            FP,
+            shiftAmount = ImmVal(StackMachine.getIdentOffset(ident))
+          )
+        )
+    }
+    instructions
   }
+
+  /*
+    private def compileBinOp(x: Expr, y: Expr)(implicit state: state, printTable: Map[(Int, Int), Type], symbolTable: Map[Ident, Type], labels: Labels): mutable.ListBuffer[Instruction] = {
+
+      val recentReg = state.recentReg match {
+        case Some(reg) => reg
+        case _  =>
+      }
+      val secondRecentReg = state.secondRecentReg match {
+        case Some(reg) => reg
+        case _  =>
+      }
+      compileExpr(x, recentReg) ++ compileExpr(y, secondRecentReg)
+
+
+    } */
+
+  def storeRes(offset: Int, size: Int, resReg: Register): Instruction = {
+    size match {
+      case 1 => StoreByte(resReg, OffsetMode(FP, shiftAmount = ImmVal(offset)))
+      case _ => Store(resReg, OffsetMode(FP, shiftAmount = ImmVal(offset)))
+    }
+  }
+
 }

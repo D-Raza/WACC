@@ -268,8 +268,8 @@ object SemanticAnalyser {
         errors ++= elseErrors
         printTable ++= elsePrintTable
 
-        ifNode.symbolTable =
-          curSymbolTable ++ thenSymbolTable ++ elseSymbolTable
+        ifNode.thenSymbolTable = curSymbolTable ++ thenSymbolTable
+        ifNode.elseSymbolTable = curSymbolTable ++ elseSymbolTable
 
       case whileNode @ While(cond, doStat) =>
         val (condType, condTypeErrors, condPrintTable) = evalTypeOfExpr(cond)
