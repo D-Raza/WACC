@@ -33,7 +33,7 @@ case object FP extends Register {
 // Intra-procedure call scratch register
 case object IP extends Register {
   def n = 12
-  override def toString: String = "ip"
+  override def toString: String = "r12"
 }
 
 // Stack pointer

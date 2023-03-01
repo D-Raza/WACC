@@ -21,11 +21,11 @@ object SemanticAnalyser {
   )(implicit source: File): List[WACCError] = {
     val errors: mutable.ListBuffer[WACCError] = mutable.ListBuffer.empty
     val functionDefs: mutable.Map[Ident, (Type, List[Type])] = mutable.Map.empty
-    val localPrintTable = Map.empty[(Int, Int), Type]
+    val localPrintTable = mutable.Map.empty[(Int, Int), Type]
+    val localSymbolTable = mutable.Map.empty[Ident, Type]
 
     program match {
       case Program(funcs, stats) =>
-        
         funcs.foreach(func => {
           if (functionDefs contains func.ident)
             errors += RedefinedFunctionError.genError(func.ident)
@@ -44,21 +44,27 @@ object SemanticAnalyser {
             paramTable += (param.ident -> param.ty)
           })
 
-          val (statErrors, statPrintTable) = checkStatSemantics(
-            paramTable.toMap,
-            func.stats,
-            Some(func.ty),
-          )
+          val (statErrors, statSymbolTable, statPrintTable) =
+            checkStatSemantics(
+              paramTable.toMap,
+              func.stats,
+              Some(func.ty)
+            )
           errors ++= statErrors
-          localPrintTable ++ statPrintTable
+          localPrintTable ++= statPrintTable
+          func.symbolTable ++= statSymbolTable
         })
 
-        val (statErrors, statPrintTable) = checkStatSemantics(program.symbolTable, stats, None)
+        val (statErrors, statSymbolTable, statPrintTable) =
+          checkStatSemantics(program.symbolTable, stats, None)
         errors ++= statErrors
-        localPrintTable ++ statPrintTable
+        localSymbolTable ++= statSymbolTable
+        localPrintTable ++= statPrintTable
+        println(statSymbolTable)
 
     }
-    program.printTable ++ localPrintTable
+    program.symbolTable = localSymbolTable.toMap
+    program.printTable ++= localPrintTable
     (errors.toList)
   }
 
@@ -83,9 +89,9 @@ object SemanticAnalyser {
   )(implicit
       source: File,
       funcTable: Map[Ident, (Type, List[Type])]
-  ): (List[WACCError], Map[(Int, Int), Type]) = {
+  ): (List[WACCError], Map[Ident, Type], Map[(Int, Int), Type]) = {
     val errors: mutable.ListBuffer[WACCError] = mutable.ListBuffer.empty
-    val printTable: Map[(Int, Int), Type] = Map.empty
+    val printTable: mutable.Map[(Int, Int), Type] = mutable.Map.empty
 
     val scopedSymbolTable: mutable.Map[Ident, Type] = mutable.Map.empty
     implicit var curSymbolTable: Map[Ident, Type] =
@@ -102,9 +108,10 @@ object SemanticAnalyser {
           curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
         }
 
-        val (rValueType, rValueErrors, rValPrintTable) = evalTypeOfRValue(rvalue)
+        val (rValueType, rValueErrors, rValPrintTable) =
+          evalTypeOfRValue(rvalue)
         errors ++= rValueErrors
-        printTable ++ rValPrintTable
+        printTable ++= rValPrintTable
         if (!(rValueType equiv ty))
           errors += TypeMismatchError.genError(
             rValueType,
@@ -114,12 +121,14 @@ object SemanticAnalyser {
           )
 
       case Assign(lValue, rValue) =>
-        val (lValueType, lValueErrors, lValPrintTable) = evalTypeOfLValue(lValue)
-        val (rValueType, rValueErrors, rValPrintTable) = evalTypeOfRValue(rValue)
+        val (lValueType, lValueErrors, lValPrintTable) =
+          evalTypeOfLValue(lValue)
+        val (rValueType, rValueErrors, rValPrintTable) =
+          evalTypeOfRValue(rValue)
         errors ++= lValueErrors
         errors ++= rValueErrors
-        printTable ++ lValPrintTable
-        printTable ++ rValPrintTable
+        printTable ++= lValPrintTable
+        printTable ++= rValPrintTable
 
         (lValueType, rValueType) match {
           case (UnknownType(), UnknownType()) =>
@@ -144,9 +153,10 @@ object SemanticAnalyser {
         }
 
       case Read(lValue) =>
-        val (lValueType, lValueErrors, lValPrintTable) = evalTypeOfLValue(lValue)
+        val (lValueType, lValueErrors, lValPrintTable) =
+          evalTypeOfLValue(lValue)
         errors ++= lValueErrors
-        printTable ++ lValPrintTable
+        printTable ++= lValPrintTable
 
         lValueType match {
           case IntType() | CharType() => ()
@@ -162,7 +172,7 @@ object SemanticAnalyser {
       case Free(expr) =>
         val (exprType, exprTypeErrors, exprPrintTable) = evalTypeOfExpr(expr)
         errors ++= exprTypeErrors
-        printTable ++ exprPrintTable
+        printTable ++= exprPrintTable
 
         exprType match {
           case PairType(_, _) | ArrayType(_) =>
@@ -181,7 +191,7 @@ object SemanticAnalyser {
       case stat @ Return(expr) =>
         val (exprType, exprTypeErrors, exprPrintTable) = evalTypeOfExpr(expr)
         errors ++= exprTypeErrors
-        printTable ++ exprPrintTable
+        printTable ++= exprPrintTable
 
         (returnType, exprType) match {
           case (Some(returnType), exprType) =>
@@ -198,7 +208,7 @@ object SemanticAnalyser {
       case Exit(expr) =>
         val (exprType, exprTypeErrors, exprPrintTable) = evalTypeOfExpr(expr)
         errors ++= exprTypeErrors
-        printTable ++ exprPrintTable
+        printTable ++= exprPrintTable
         exprType match {
           case IntType() =>
           case _ =>
@@ -213,20 +223,19 @@ object SemanticAnalyser {
       case Print(expr) =>
         val (exprType, exprTypeErrors, exprPrintTable) = evalTypeOfExpr(expr)
         errors ++= exprTypeErrors
-        printTable ++ exprPrintTable
-        printTable.+(expr.pos -> exprType)
+        printTable ++= exprPrintTable
+        printTable.addOne(expr.pos, exprType)
 
       case Println(expr) =>
         val (exprType, exprTypeErrors, exprPrintTable) = evalTypeOfExpr(expr)
         errors ++= exprTypeErrors
-        printTable ++ exprPrintTable
-        printTable.+(expr.pos -> exprType)
+        printTable ++= exprPrintTable
+        printTable.addOne(expr.pos, exprType)
 
-
-      case If(cond, thenStat, elseStat) =>
+      case ifNode @ If(cond, thenStat, elseStat) =>
         val (condType, condTypeErrors, condPrintTable) = evalTypeOfExpr(cond)
         errors ++= condTypeErrors
-        printTable ++ condPrintTable
+        printTable ++= condPrintTable
 
         condType match {
           case BoolType() => ()
@@ -241,28 +250,31 @@ object SemanticAnalyser {
 
         curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
 
-        val (thenErrors, thenPrintTable) = checkStatSemantics(
+        val (thenErrors, thenSymbolTable, thenPrintTable) = checkStatSemantics(
           curSymbolTable,
           thenStat,
           returnType
         )
 
         errors ++= thenErrors
-        printTable ++ thenPrintTable
+        printTable ++= thenPrintTable
 
-        val (elseErrors, elsePrintTable) = checkStatSemantics(
+        val (elseErrors, elseSymbolTable, elsePrintTable) = checkStatSemantics(
           curSymbolTable,
           elseStat,
           returnType
         )
 
         errors ++= elseErrors
-        printTable ++ elsePrintTable
+        printTable ++= elsePrintTable
 
-      case While(cond, doStat) =>
+        ifNode.symbolTable =
+          curSymbolTable ++ thenSymbolTable ++ elseSymbolTable
+
+      case whileNode @ While(cond, doStat) =>
         val (condType, condTypeErrors, condPrintTable) = evalTypeOfExpr(cond)
         errors ++= condTypeErrors
-        printTable ++ condPrintTable
+        printTable ++= condPrintTable
         condType match {
           case BoolType() => ()
           case _ =>
@@ -276,29 +288,32 @@ object SemanticAnalyser {
 
         curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
 
-        val (doErrors, doPrintTable) = checkStatSemantics(
+        val (doErrors, doSymbolTable, doPrintTable) = checkStatSemantics(
           curSymbolTable,
           doStat,
           returnType
         )
 
         errors ++= doErrors
-        printTable ++ doPrintTable
+        whileNode.symbolTable = curSymbolTable ++ doSymbolTable
+        printTable ++= doPrintTable
 
-      case Scope(scopeStats) =>
+      case scopeNode @ Scope(scopeStats) =>
         curSymbolTable = symbolTable ++ scopedSymbolTable.toMap
 
-        val (scopeErrors, scopePrintTable) = checkStatSemantics(
-          curSymbolTable,
-          scopeStats,
-          returnType
-        )
+        val (scopeErrors, scopeSymbolTable, scopePrintTable) =
+          checkStatSemantics(
+            curSymbolTable,
+            scopeStats,
+            returnType
+          )
 
         errors ++= scopeErrors
-        printTable ++ scopePrintTable
+        scopeNode.symbolTable = curSymbolTable ++ scopeSymbolTable
+        printTable ++= scopePrintTable
     }
 
-    (errors.toList, printTable.toMap)
+    (errors.toList, curSymbolTable.toMap, printTable.toMap)
   }
 
   /** Evaluates the type of a left-hand value
@@ -319,22 +334,22 @@ object SemanticAnalyser {
       symbolTable: Map[Ident, Type]
   ): (Type, List[WACCError], Map[(Int, Int), Type]) = {
     val errors: mutable.ListBuffer[WACCError] = mutable.ListBuffer.empty
-    val printTable: Map[(Int, Int), Type] = Map.empty
+    val printTable: mutable.Map[(Int, Int), Type] = mutable.Map.empty
 
     lValue match {
       case ident: Ident =>
         symbolTable get ident match {
-          case Some(ty) => (ty, errors.toList, printTable)
+          case Some(ty) => (ty, errors.toList, printTable.toMap)
           case None =>
             (
               ErrorType()(ident.pos),
               (errors += UndefinedVariableError.genError(ident)).toList,
-              printTable
+              printTable.toMap
             )
         }
       case ArrayElem(ident, _) =>
         symbolTable get ident match {
-          case Some(ArrayType(ty)) => (ty, errors.toList, printTable)
+          case Some(ArrayType(ty)) => (ty, errors.toList, printTable.toMap)
           case Some(ty) =>
             (
               ErrorType()(ident.pos),
@@ -343,20 +358,20 @@ object SemanticAnalyser {
                 Set(ArrayType(AnyType()(NULLPOS))(NULLPOS)),
                 ident.pos,
                 "array index"
-              )).toList, 
-              printTable
+              )).toList,
+              printTable.toMap
             )
           case None =>
             (
               ErrorType()(ident.pos),
               (errors += UndefinedVariableError.genError(ident)).toList,
-              printTable
+              printTable.toMap
             )
         }
       case Fst(l) =>
         evalTypeOfLValue(l) match {
           case (PairType(fstTy, _), lValueErrors, lValPrintTable) =>
-            (fstTy.asType, lValueErrors, printTable ++ lValPrintTable)
+            (fstTy.asType, lValueErrors, printTable.toMap ++ lValPrintTable)
           case (ty, lValueErrors, lValPrintTable) =>
             (
               ErrorType()(l.pos),
@@ -366,13 +381,13 @@ object SemanticAnalyser {
                 l.pos,
                 "fst"
               )).toList,
-              printTable ++ lValPrintTable
+              printTable.toMap ++ lValPrintTable
             )
         }
       case Snd(l) =>
         evalTypeOfLValue(l) match {
           case (PairType(_, sndTy), lValueErrors, lValPrintTable) =>
-            (sndTy.asType, lValueErrors, printTable ++ lValPrintTable)
+            (sndTy.asType, lValueErrors, printTable.toMap ++ lValPrintTable)
           case (ty, lValueErrors, lValPrintTable) =>
             (
               ErrorType()(l.pos),
@@ -382,7 +397,7 @@ object SemanticAnalyser {
                 l.pos,
                 "snd"
               )).toList,
-              printTable ++ lValPrintTable
+              printTable.toMap ++ lValPrintTable
             )
         }
     }
@@ -406,25 +421,33 @@ object SemanticAnalyser {
       symbolTable: Map[Ident, Type]
   ): (Type, List[WACCError], Map[(Int, Int), Type]) = {
     val errors: mutable.ListBuffer[WACCError] = mutable.ListBuffer.empty
-    val printTable: Map[(Int, Int), Type] = Map.empty
+    val printTable: mutable.Map[(Int, Int), Type] = mutable.Map.empty
 
     rValue match {
       case expr: Expr => evalTypeOfExpr(expr)
       case arrayLit @ ArrayLit(xs) =>
         xs match {
           case Nil =>
-            (ArrayType(AnyType()(NULLPOS))(arrayLit.pos), errors.toList, printTable)
+            (
+              ArrayType(AnyType()(NULLPOS))(arrayLit.pos),
+              errors.toList,
+              printTable.toMap
+            )
           case head :: tail =>
             val (expectedArrElemType, headErrors, localPrintTable) =
               evalTypeOfExpr(head)
             errors ++= headErrors
-            printTable ++ localPrintTable
+            printTable ++= localPrintTable
 
             val (actualArrElemType, tailErrors, arrPrintTable) =
               checkExprs(tail, expectedArrElemType)
             errors ++= tailErrors
-            printTable ++ arrPrintTable
-            (ArrayType(actualArrElemType)(arrayLit.pos), errors.toList, printTable)
+            printTable ++= arrPrintTable
+            (
+              ArrayType(actualArrElemType)(arrayLit.pos),
+              errors.toList,
+              printTable.toMap
+            )
         }
       case NewPair(fst, snd) =>
         val (fstType, fstErrors, fstPrintTable) = evalTypeOfExpr(fst)
@@ -434,7 +457,7 @@ object SemanticAnalyser {
         (
           PairType(fstType.eraseInnerTypes, sndType.eraseInnerTypes)(NULLPOS),
           errors.toList,
-          printTable ++ (fstPrintTable ++ sndPrintTable)
+          printTable.toMap ++ fstPrintTable ++ sndPrintTable
         )
       case c @ Call(f, args) =>
         funcTable get f match {
@@ -442,7 +465,7 @@ object SemanticAnalyser {
             val (argTypes, argErrors, argPrintTable) =
               args.map(evalTypeOfExpr(_)).unzip3
             errors ++= argErrors.flatten
-            printTable ++ argPrintTable.flatten
+            printTable ++= argPrintTable.flatten
 
             val (returnType, paramTypes) = funcTable(f)
             if (argTypes.length != paramTypes.length)
@@ -463,29 +486,31 @@ object SemanticAnalyser {
                   )
             }
 
-            (returnType, errors.toList, printTable)
+            (returnType, errors.toList, printTable.toMap)
           case None =>
             (
               ErrorType()(c.pos),
               (errors += UndefinedFunctionError.genError(f)).toList,
-              printTable
+              printTable.toMap
             )
         }
       case Fst(lValue) =>
         val (exprType, error, exprPrintTable) = evalTypeOfLValue(lValue)
         errors ++= error
-        printTable ++ exprPrintTable
+        printTable ++= exprPrintTable
         exprType match {
-          case PairType(fstType, _) => (fstType.asType, errors.toList, printTable)
-          case _                    => (ErrorType()(lValue.pos), errors.toList, printTable)
+          case PairType(fstType, _) =>
+            (fstType.asType, errors.toList, printTable.toMap)
+          case _ => (ErrorType()(lValue.pos), errors.toList, printTable.toMap)
         }
       case Snd(lValue) =>
         val (exprType, error, exprPrintTable) = evalTypeOfLValue(lValue)
         errors ++= error
-        printTable ++ exprPrintTable
+        printTable ++= exprPrintTable
         exprType match {
-          case PairType(_, sndType) => (sndType.asType, errors.toList, printTable)
-          case _                    => (ErrorType()(lValue.pos), errors.toList, printTable)
+          case PairType(_, sndType) =>
+            (sndType.asType, errors.toList, printTable.toMap)
+          case _ => (ErrorType()(lValue.pos), errors.toList, printTable.toMap)
         }
     }
   }
@@ -507,25 +532,32 @@ object SemanticAnalyser {
       source: File,
       symbolTable: Map[Ident, Type]
   ): (Type, List[WACCError], Map[(Int, Int), Type]) = {
-    val printTable: Map[(Int, Int), Type] = Map.empty
+    val printTable: mutable.Map[(Int, Int), Type] = mutable.Map.empty
     expr match {
-      case intLit: IntegerLiter => (IntType()(intLit.pos), Nil, printTable)
-      case boolLit: BoolLiter   => (BoolType()(boolLit.pos), Nil, printTable)
-      case charLit: CharLiter   => (CharType()(charLit.pos), Nil, printTable)
-      case strLit: StrLiter     => (StringType()(strLit.pos), Nil, printTable)
+      case intLit: IntegerLiter =>
+        (IntType()(intLit.pos), Nil, printTable.toMap)
+      case boolLit: BoolLiter =>
+        (BoolType()(boolLit.pos), Nil, printTable.toMap)
+      case charLit: CharLiter =>
+        (CharType()(charLit.pos), Nil, printTable.toMap)
+      case strLit: StrLiter => (StringType()(strLit.pos), Nil, printTable.toMap)
       case nullPairLit @ Null() =>
         (
           PairType(AnyType()(nullPairLit.pos), AnyType()(nullPairLit.pos))(
             nullPairLit.pos
           ),
           Nil,
-          printTable
+          printTable.toMap
         )
       case ident: Ident =>
         if (symbolTable contains ident) {
-          (symbolTable(ident).positioned(ident.pos), Nil, printTable)
+          (symbolTable(ident).positioned(ident.pos), Nil, printTable.toMap)
         } else {
-          (ErrorType()(ident.pos), List(UndefinedVariableError.genError(ident)), printTable)
+          (
+            ErrorType()(ident.pos),
+            List(UndefinedVariableError.genError(ident)),
+            printTable.toMap
+          )
         }
       case ArrayElem(ident, xs) =>
         def getArrayTypeRank(ty: Type): Int = {
@@ -542,7 +574,7 @@ object SemanticAnalyser {
             val (argTypes, argErrors, pt) =
               xs.map(evalTypeOfExpr(_)).unzip3
             errors ++= argErrors.flatten
-            printTable ++ pt.foldLeft(Map.empty: Map[(Int, Int), Type]) {
+            printTable ++= pt.foldLeft(Map.empty: Map[(Int, Int), Type]) {
               (acc, m) => acc ++ m
             }
             if (xs.length > getArrayTypeRank(t))
@@ -570,7 +602,7 @@ object SemanticAnalyser {
                 )
             }
 
-            (innerType.positioned(ident.pos), errors.toList, printTable)
+            (innerType.positioned(ident.pos), errors.toList, printTable.toMap)
           case Some(ot) =>
             (
               ErrorType()(ident.pos),
@@ -580,13 +612,13 @@ object SemanticAnalyser {
                 ident.pos,
                 s"array access for $ident"
               )).toList,
-              printTable
+              printTable.toMap
             )
           case None =>
             (
               ErrorType()(ident.pos),
               (errors += UndefinedVariableError.genError(ident)).toList,
-              printTable
+              printTable.toMap
             )
         }
       case not @ Not(x) =>
@@ -784,25 +816,25 @@ object SemanticAnalyser {
       source: File,
       symbolTable: Map[Ident, Type]
   ): (Type, List[WACCError], Map[(Int, Int), Type]) = {
-    val printTable: Map[(Int, Int), Type] = Map.empty
+    val printTable: mutable.Map[(Int, Int), Type] = mutable.Map.empty
     exprs match {
-      case Nil => (expectedType, Nil, printTable)
+      case Nil => (expectedType, Nil, printTable.toMap)
       case _ => {
         val evals = exprs.map(checkExprType(_, expectedType, expectedType))
         val types = evals.map(_._1)
         val errors = evals.flatMap(_._2)
         val pts = evals.map(_._3)
-        printTable ++ pts.foldLeft(Map.empty: Map[(Int, Int), Type]) {
-              (acc, m) => acc ++ m
-            }
+        printTable ++= pts.foldLeft(Map.empty: Map[(Int, Int), Type]) {
+          (acc, m) => acc ++ m
+        }
         if (types.distinct.length == 1 && (types.head equiv expectedType)) {
-          (types.head, errors, printTable)
+          (types.head, errors, printTable.toMap)
         } else {
           (
             (
               ErrorType()(exprs.head.pos),
               errors,
-              printTable
+              printTable.toMap
             )
           )
         }

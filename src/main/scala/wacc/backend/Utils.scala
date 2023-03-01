@@ -1,138 +1,162 @@
 package wacc.backend
 import wacc.backend._
 import wacc.backend.Globals.WORD_SIZE
-import wacc.backend.Condition.{EQ, NE}
+import wacc.backend.Condition.NE
 
 import scala.collection.mutable
 
 object Utils {
 
-    var printStringFlag = false
-    var printIntFlag = false
-    var printCharFlag = false
-    var printBoolFlag = false
-    var printlnFlag = false 
-    var printRefFlag = false 
+  var printStringFlag = false
+  var printIntFlag = false
+  var printCharFlag = false
+  var printBoolFlag = false
+  var printlnFlag = false
+  var printRefFlag = false
 
-
-     def addUtils()(implicit instructions: mutable.ListBuffer[Instruction]): Unit = {
-        if (printStringFlag) {
-            printString()
-        }
-        if (printIntFlag) {
-            printInt()
-        }
-        if (printCharFlag) {
-            printChar()
-        }
-        if (printBoolFlag) {
-            printBool()
-        }
-        if (printlnFlag) {
-            printLine()
-        }
-        if (printRefFlag) {
-            printRef()
-        }
+  def addUtils()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): Unit = {
+    if (printStringFlag) {
+      printString()
     }
-
-    def printString()(implicit instructions: mutable.ListBuffer[Instruction]): Unit = {
-        val stringDataFormat = "%.*s\u0000"
-        instructions.addAll(
-            List(
-                Label("p_print_string"),
-                Push(List(LR)),
-                Load(R1, R0),
-                AddInstr(R2, R0, ImmVal(WORD_SIZE)),
-                Load(R0, LabelOp(Labels.addDataMsg(stringDataFormat))),
-                // TODO: Add string data format to data label
-                BranchAndLink("printf"),
-                Move(R0, ImmVal(0)),
-                BranchAndLink("fflush"),
-                Pop(List(PC))
-            )
-        )
+    if (printIntFlag) {
+      printInt()
     }
-
-    def printInt()(implicit instructions: mutable.ListBuffer[Instruction]): Unit = {
-        val intDataFormat = "%d\u0000"
-        instructions.addAll(
-            List(
-                Label("p_print_int"),
-                Push(List(LR)),
-                Move(R1, R0),
-                Load(R0, LabelOp(Labels.addDataMsg(intDataFormat))),
-                BranchAndLink("printf"),
-                Move(R0, ImmVal(0)),
-                BranchAndLink("fflush"),
-                Pop(List(PC))
-            )
-        )
+    if (printCharFlag) {
+      printChar()
     }
-
-    def printChar()(implicit instructions: mutable.ListBuffer[Instruction]): Unit = {
-        instructions.addAll(
-            List(
-                Label("p_print_char"),
-                Push(List(LR)),
-                BranchAndLink("putchar"),
-                Pop(List(PC))
-            )
-        )
+    if (printBoolFlag) {
+      printBool()
     }
-
-    def printBool()(implicit instructions: mutable.ListBuffer[Instruction]): Unit = {
-        val trueDataFormat = "true\u0000"
-        val falseDataFormat = "false\u0000"
-        instructions.addAll(
-            List(
-                Label("p_print_bool"),
-                Push(List(LR)),
-                Cmp(R0, ImmVal(0)),
-                Load(R0, LabelOp(Labels.addDataMsg(trueDataFormat)), NE),
-                Load(R1, LabelOp(Labels.addDataMsg(falseDataFormat)), EQ),
-                BranchAndLink("printf"),
-                Move(R0, ImmVal(0)),
-                BranchAndLink("fflush"),
-                Pop(List(PC))
-            )
-        )
-
+    if (printlnFlag) {
+      printLine()
     }
+  }
+
+  def printString()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): Unit = {
+    instructions.addAll(
+      List(
+        Directive("data"),
+        Directive("    word 4"),
+        Label(".L._prints_str0"),
+        Directive(s"    asciz \"%.*s\""),
+        Directive("text"),
+        Label("_prints"),
+        Push(List(LR)),
+        Move(R2, R0),
+        Load(R1, PreIndexedMode(R0, shiftAmount = ImmVal(-WORD_SIZE))),
+        Load(R0, LabelOp(".L._prints_str0")),
+        BranchAndLink("printf"),
+        Move(R0, ImmVal(0)),
+        BranchAndLink("fflush"),
+        Pop(List(PC))
+      )
+    )
+  }
+
+  def printInt()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): Unit = {
+    instructions.addAll(
+      List(
+        Directive("data"),
+        Directive("    word 2"),
+        Label(".L._printi_str0"),
+        Directive(s"    asciz \"%d\""),
+        Directive("text"),
+        Label("_printi"),
+        Push(List(LR)),
+        Move(R1, R0),
+        Load(R0, LabelOp(".L._printi_str0")),
+        BranchAndLink("printf"),
+        Move(R0, ImmVal(0)),
+        BranchAndLink("fflush"),
+        Pop(List(PC))
+      )
+    )
+  }
+
+  def printChar()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): Unit = {
+    instructions.addAll(
+      List(
+        Directive("data"),
+        Directive("    word 2"),
+        Label(".L._printc_str0"),
+        Directive(s"    asciz \"%c\""),
+        Directive("text"),
+        Label("_printc"),
+        Push(List(LR)),
+        Move(R1, R0),
+        Load(R0, LabelOp(".L._printc_str0")),
+        BranchAndLink("printf"),
+        Move(R0, ImmVal(0)),
+        BranchAndLink("fflush"),
+        Pop(List(PC))
+      )
+    )
+
+  }
+  def printBool()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): Unit = {
+    instructions.addAll(
+      List(
+        Directive("data"),
+        Directive("    word 5"),
+        Label(".L._printb_str0"),
+        Directive(s"    asciz \"false\""),
+        Directive("    word 4"),
+        Label(".L._printb_str1"),
+        Directive(s"    asciz \"true\""),
+        Directive("    word 4"),
+        Label(".L._printb_str2"),
+        Directive(s"    asciz \"%.*s\""),
+        Directive("text"),
+        Label("_printb"),
+        Push(List(LR)),
+        Cmp(R0, ImmVal(0)),
+        Branch(".L_printb0", NE),
+        Load(R2, LabelOp(".L._printb_str0")),
+        Branch(".L_printb1"),
+        Label(".L_printb0"),
+        Load(R2, LabelOp(".L._printb_str1")),
+        Label(".L_printb1"),
+        Load(R1, PreIndexedMode(R2, shiftAmount = ImmVal(-WORD_SIZE))),
+        Load(R0, LabelOp(".L._printb_str2")),
+        BranchAndLink("printf"),
+        Move(R0, ImmVal(0)),
+        BranchAndLink("fflush"),
+        Pop(List(PC))
+      )
+    )
+
+  }
+
+  private def printLine()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): Unit = {
+    instructions.addAll(
+      List(
+        Directive("data"),
+        Directive("    word 0"),
+        Label(".L._println_str0"),
+        Directive(s"    asciz \"\""),
+        Directive("text"),
+        Label("_println"),
+        Push(List(LR)),
+        Load(R0, LabelOp(".L._println_str0")),
+        BranchAndLink("puts"),
+        Move(R0, ImmVal(0)),
+        BranchAndLink("fflush"),
+        Pop(List(PC))
+      )
+    )
+  }
 
 
-
-    private def printLine()(implicit instructions: mutable.ListBuffer[Instruction]): Unit = {
-        instructions.addAll(
-            List(
-                Label("p_print_ln"),
-                Push(List(LR)),
-                Load(R0, LabelOp(Labels.addDataMsg("\n"))),
-                BranchAndLink("printf"), // puts?
-                Move(R0, ImmVal(0)),
-                BranchAndLink("fflush"),
-                Pop(List(PC))
-            )
-        )
-    }
-
-    def printRef()(implicit instructions: mutable.Buffer[Instruction]): Unit = {
-        instructions.addAll(
-            List(
-                Label("p_print_reference"),
-                Push(List(LR)),
-                Move(R1, R0),
-                Load(R0, LabelOp(Labels.addDataMsg("%p\u0000"))),
-
-                AddInstr(R0, R0, ImmVal(WORD_SIZE)),
-                BranchAndLink("printf"),
-                Move(R0, ImmVal(0)),
-                BranchAndLink("fflush"),
-                Pop(List(PC))
-            )
-        )
-    } 
-
-
-   
 }

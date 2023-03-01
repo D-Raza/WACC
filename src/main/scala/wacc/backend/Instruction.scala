@@ -6,6 +6,13 @@ sealed trait Instruction {
   def opsToString: String
   val opcode: String
   override def toString: String = s"\t$opcode $opsToString"
+  def putOnStack(offset: Int): Instruction = this match {
+    case Load(destReg, addrMode, cond) =>
+      Load(destReg, addrMode.putOnStack(offset), cond)
+    case Store(srcReg, addrMode, cond) =>
+      Store(srcReg, addrMode.putOnStack(offset), cond)
+    case _ => this
+  }
 }
 
 // Arithmetic instructions
@@ -138,7 +145,13 @@ case class Label(label: String) extends Instruction {
 case class Directive(directiveType: String) extends Instruction {
   override def opsToString: String = ""
   val opcode = ""
-  override def toString = "." + directiveType
+  override def toString = {
+    val firstNonWhiteSpace =
+      directiveType.length() - directiveType.stripLeading().length()
+    directiveType.toList.splitAt(firstNonWhiteSpace) match {
+      case (prefix, suffix) => prefix.mkString + "." + suffix.mkString
+    }
+  }
 }
 
 // Branch instructions

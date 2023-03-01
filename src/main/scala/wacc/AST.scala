@@ -182,8 +182,8 @@ object AST {
 
   /* Case Classes and Traits */
   case class Program(funcs: List[Func], stat: List[Stat])(val pos: (Int, Int)) {
-    val symbolTable: Map[Ident, Type] = Map.empty
-    val printTable: Map[(Int, Int), Type] = Map.empty
+    var symbolTable: Map[Ident, Type] = Map.empty
+    var printTable: Map[(Int, Int), Type] = Map.empty
   }
 
   case class Func(
@@ -193,7 +193,10 @@ object AST {
       stats: List[Stat]
   )(
       val pos: (Int, Int)
-  )
+  ) {
+    var symbolTable: Map[Ident, Type] = Map.empty
+    var printTable: Map[(Int, Int), Type] = Map.empty
+  }
 
   case class Param(ty: Type, ident: Ident)(val pos: (Int, Int))
 
@@ -218,12 +221,18 @@ object AST {
 
   case class If(cond: Expr, thenStat: List[Stat], elseStat: List[Stat])(
       val pos: (Int, Int)
-  ) extends Stat
+  ) extends Stat {
+    var symbolTable: Map[Ident, Type] = Map.empty
+  }
 
   case class While(cond: Expr, doStat: List[Stat])(val pos: (Int, Int))
-      extends Stat
+      extends Stat {
+    var symbolTable: Map[Ident, Type] = Map.empty
+  }
 
-  case class Scope(stats: List[Stat])(val pos: (Int, Int)) extends Stat
+  case class Scope(stats: List[Stat])(val pos: (Int, Int)) extends Stat {
+    var symbolTable: Map[Ident, Type] = Map.empty
+  }
 
   case class Ident(name: String)(val pos: (Int, Int)) extends LValue with Expr {
     override def toString(): String = s"identifier ${name}"

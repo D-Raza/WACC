@@ -1,7 +1,17 @@
 package wacc.backend
 import ShiftType._
 
-trait Operand2
+trait Operand2 {
+  def putOnStack(offset: Int): Operand2 = this match {
+    case OffsetMode(baseReg, auxReg, shiftType, _) =>
+      OffsetMode(baseReg, auxReg, shiftType, ImmVal(offset))
+    case PostIndexedMode(baseReg, auxReg, shiftType, shiftAmount) =>
+      PostIndexedMode(baseReg, auxReg, shiftType, ImmVal(offset))
+    case PreIndexedMode(baseReg, auxReg, shiftType, shiftAmount) =>
+      PreIndexedMode(baseReg, auxReg, shiftType, ImmVal(offset))
+    case _ => this
+  }
+}
 
 // Addressing modes
 sealed trait AddressingMode extends Operand2 {
