@@ -61,6 +61,11 @@ test_task() {
         expected_output=$(awk '/^# Output/{getline; p=1} p && /^#/ {print substr($0, 3); next} /^$/ {p=0}' $file | awk 'NR>1{print PREV} {PREV=$0} END{printf("%s",$0)}'; r=$?; echo /; exit "$r")
         expected_output=${expected_output%/}
     fi
+
+    std_input=""
+    if grep -q '# Input:' $file; then 
+        std_input=$(awk -F ': ' '/^# Input:/ {print $2; exit}' $file)
+    fi
     
     # Account for invalid exit codes
     if [ "$expected_runtime_exit_code" -ne 100 ] && [ "$expected_runtime_exit_code" -ne 200 ]; then
@@ -83,7 +88,11 @@ test_task() {
                 assembler_output=$(arm-linux-gnueabi-gcc -o "$EXECDIR/$filename" -mcpu=arm1176jzf-s -mtune=arm1176jzf-s "$filename.s" 2>&1)
                 assembler_exit_code=$?
                 if [ $assembler_exit_code -eq 0 ]; then
-                    emulator_output=$(qemu-arm -L /usr/arm-linux-gnueabi/ "$EXECDIR/$filename"; r=$?; echo /; exit "$r")
+                    if [ ! -z "$std_input" ]; then
+                        emulator_output=$(echo "$std_input" | qemu-arm -L /usr/arm-linux-gnueabi/ "$EXECDIR/$filename"; r=$?; echo /; exit "$r")
+                    else
+                        emulator_output=$(qemu-arm -L /usr/arm-linux-gnueabi/ "$EXECDIR/$filename"; r=$?; echo /; exit "$r")
+                    fi
                     emulator_exit_code=$?
                     emulator_output=${emulator_output%/}
                     if [ $emulator_exit_code -eq $expected_runtime_exit_code ]; then
@@ -127,8 +136,8 @@ test_task() {
         echo
     fi
 
-    # if [ "$emulator_output" != "$expected_output" ]; then
-    if [ ! -z "$emulator_output" ]; then
+    # if [ ! -z "$emulator_output" ]; then
+    if [ "$emulator_output" != "$expected_output" ]; then
         echo -e "\e[34m--- Emulator Output Difference ---\e[0m"
         echo "$emulator_output"
         echo "$output_diff"

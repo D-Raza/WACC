@@ -4,6 +4,19 @@ object Condition extends Enumeration {
   type Condition = Value
 
   // Condition codes
-  val EQ, NE, GT, LT, GE, LE, LS, HI, VC, VS, PL, MI, CC, CS = Value
+  val EQ = Value("eq")
+  val NE = Value("ne")
+  val GT = Value("gt")
+  val LT = Value("lt")
+  val GE = Value("ge")
+  val LE = Value("le")
+  val LS = Value("ls")
+  val HI = Value("hi")
+  val VC = Value("vc")
+  val VS = Value("vs")
+  val PL = Value("pl")
+  val MI = Value("mi")
+  val CC = Value("cc")
+  val CS = Value("cs")
   val AL = Value("")
 }
