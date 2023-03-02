@@ -83,8 +83,9 @@ object CodeGenerator {
       case Skip() => instructions
 
       case Declare(ty, ident, rValue) => {
-        state.getScratchReg match {
+        state.getRegOrNone match {
           case Some(scratchReg) => {
+            instructions += Comment("DECLARE Some case, scratchReg: " + scratchReg)
             instructions ++= compileRValue(rValue, scratchReg)
             state.identToReg += (ident -> scratchReg)
           }
@@ -191,7 +192,7 @@ object CodeGenerator {
       }
 
       case ifStatNode @ If(_, _, _) =>
-        instructions ++= compileIfStat(ifStatNode, state.tmp)
+        instructions ++= compileIfStat(ifStatNode, state.getReg) // (ifStatNode, state.tmp)
 
       case whileNode @ While(cond, bodyStat) => {
         val uniqueWhileName = "while_" + state.getNewLabelId;
@@ -206,7 +207,7 @@ object CodeGenerator {
         val condReg = state.getScratchReg.get
 
         instructions += Label(condLabel)
-        instructions ++= compileExpr(cond, state.tmp)
+        instructions ++= compileExpr(cond, state.getReg) //state.tmp)
 
         instructions.addAll(
           List(
@@ -246,6 +247,7 @@ object CodeGenerator {
           val arrayItemSize = xs.head.size
           val arraySize = xs.head.size * xs.length
           val arrayStartReg: Register = state.getScratchReg.get
+          val a_reg = state.getReg // state.tmp 
 
           instructions.addAll(
             List(
@@ -253,18 +255,18 @@ object CodeGenerator {
               BranchAndLink("malloc"),
               Move(arrayStartReg, R0),
               AddInstr(arrayStartReg, arrayStartReg, ImmVal(WORD_SIZE)),
-              Move(state.tmp, ImmVal(xs.length)),
+              Move(a_reg, ImmVal(xs.length)),
               Store(
-                state.tmp,
+                a_reg,
                 OffsetMode(arrayStartReg, shiftAmount = ImmVal(-4))
               )
             )
           )
 
           for ((expr, i) <- xs.zipWithIndex) {
-            instructions ++= compileExpr(expr, state.tmp)
+            instructions ++= compileExpr(expr, a_reg)
             instructions += Store(
-              state.tmp,
+              a_reg,
               OffsetMode(arrayStartReg, shiftAmount = ImmVal(arrayItemSize * i))
             )
           }
@@ -330,7 +332,7 @@ object CodeGenerator {
             Move(R1, R10, Condition.GE),
             BranchAndLink("_boundsCheck", Condition.GE),
             Store(
-              state.tmp,
+              state.getReg,//state.tmp,
               OffsetMode(
                 baseReg = R3,
                 auxReg = Some(R10),
@@ -360,6 +362,28 @@ object CodeGenerator {
       labels: Labels
   ): mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
+
+ private def compileBinaryOp(x: Expr, y: Expr, resReg: Register)(implicit
+      state: CodeGenState,
+      printTable: Map[(Int, Int), Type],
+      symbolTable: Map[Ident, Type],
+      labels: Labels
+  ): mutable.ListBuffer[Instruction] = {
+    mutable.ListBuffer.empty
+  }
+
+  private def compileUnaryOp(x: Expr, y: Expr, resReg: Register)(implicit
+      state: CodeGenState,
+      printTable: Map[(Int, Int), Type],
+      symbolTable: Map[Ident, Type],
+      labels: Labels
+  ): mutable.ListBuffer[Instruction] = {
+    mutable.ListBuffer.empty
+
+  }
+
+
+
   def compileExpr(expr: Expr, resReg: Register)(implicit
       state: CodeGenState,
       printTable: Map[(Int, Int), Type],
@@ -367,11 +391,11 @@ object CodeGenerator {
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
-    val operand1Reg = state.tmp
-    val operand2Reg = state.tmp2
+    val operand1Reg = state.getReg
+    val operand2Reg = state.getReg
 
     expr match {
-      case ident: Ident => instructions ++= compileIdent(ident, resReg)
+      case ident: Ident => instructions ++= compileIdent(ident, resReg) // (ident, operand1Reg)
       // TODO: Overflow
       case Mult(x, y) =>
         instructions ++= compileExpr(x, operand1Reg)
@@ -410,7 +434,9 @@ object CodeGenerator {
         )
 
       case Add(x, y) =>
+        instructions += Comment("ADD Expr, compiling x")
         instructions ++= compileExpr(x, operand1Reg)
+        instructions += Comment("ADD Expr, compiling x")
         instructions ++= compileExpr(y, operand2Reg)
         instructions += AddInstr(resReg, operand1Reg, operand2Reg)
 
@@ -485,13 +511,15 @@ object CodeGenerator {
         )
 
       case Equal(x, y) =>
+        instructions += Comment(state.availableRegs.toString())
+        instructions += Comment(state.usedRegs.toString())
+        instructions += Comment("Compile x in Equal")
         instructions ++= compileExpr(x, operand1Reg)
+        instructions += Comment("Compile y in Equal")
         instructions ++= compileExpr(y, operand2Reg)
         instructions.addAll(
           List(
             Cmp(operand1Reg, operand2Reg),
-            // Move(R7, ImmVal(1), Condition.EQ),
-            // Move(R7, ImmVal(0), Condition.NE)
             Move(resReg, ImmVal(1), Condition.EQ),
             Move(resReg, ImmVal(0), Condition.NE)
           )
