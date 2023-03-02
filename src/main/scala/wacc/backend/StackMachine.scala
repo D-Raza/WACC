@@ -5,13 +5,17 @@ import wacc.AST.{Param, Ident, Type}
 
 object StackMachine {
   val stackFrameList: mutable.ListBuffer[StackFrame] = mutable.ListBuffer.empty
-  var usedStackSize = 0
+  def currStackSize =
+    if (stackFrameList.nonEmpty) stackFrameList.last.currVarOffset else 0
 
-  def addDeclaration(ident: Ident, size: Int): Unit = {
+  def addDeclaration(ident: Ident, size: Int): Int = {
     val currStackFrame = stackFrameList.last
     currStackFrame.declaredVarMap += (ident -> currStackFrame.currVarOffset)
+    println("Adding declaration: " + ident + " " + currStackFrame.currVarOffset)
 
-    currStackFrame.currArgOffset += size
+    currStackFrame.currVarOffset += size
+
+    currStackFrame.currVarOffset - size
   }
 
   def addStackFrame(
@@ -43,16 +47,12 @@ object StackMachine {
     val stackFrameToRemove = stackFrameList.remove(stackFrameList.length - 1)
 
     instructions.addAll(
-      List(
-        Pop(List(R4, R5, R6, R7, R8, R10, IP))
-        // Push(List(FP))
-      )
-    )
-    instructions.addAll(
       if (!fun) unassignStackSpace(stackFrameToRemove.currVarOffset) else List()
     )
-    instructions += Pop(List(FP))
-
+    instructions ++= List(
+      Pop(List(R4, R5, R6, R7, R8, R10, IP)),
+      Pop(List(FP))
+    )
     instructions
   }
 
@@ -60,11 +60,13 @@ object StackMachine {
       spaceRequired: Int
   ): mutable.ListBuffer[Instruction] = {
     if (spaceRequired == 0)
-      mutable.ListBuffer.empty
+      mutable.ListBuffer(PendingStackOffset(SubInstr(SP, SP, ImmVal(0))))
     else {
       val instructions: mutable.ListBuffer[Instruction] =
         mutable.ListBuffer.empty
+
       instructions += SubInstr(SP, SP, ImmVal(spaceRequired))
+
       instructions
     }
   }
@@ -77,19 +79,30 @@ object StackMachine {
     else {
       val instructions: mutable.ListBuffer[Instruction] =
         mutable.ListBuffer.empty
-      instructions += AddInstr(SP, SP, ImmVal(spaceAcquired))
+
+      if (spaceAcquired > 0)
+        instructions += AddInstr(SP, SP, ImmVal(spaceAcquired))
+
       instructions
     }
   }
 
   def getIdentOffset(id: Ident): Int = {
-    stackFrameList.reverse.foreach(stackFrame => {
-      stackFrame.getVar(id) match {
-        case Some(x) => {}
-        case None    =>
+    var found = false
+    var res = 0
+
+    for (stackFrame <- stackFrameList.reverse) {
+      if (!found) {
+        stackFrame.getVar(id) match {
+          case Some(x) => {
+            res = x
+            found = true
+          }
+          case None =>
+        }
       }
-    })
-    0
+    }
+    res
   }
 }
 
@@ -101,42 +114,3 @@ class StackFrame(symbolTable: Map[Ident, Type], paramList: List[Param]) {
 
   def getVar(id: Ident): Option[Int] = declaredVarMap.get(id)
 }
-
-/*
-  def offset(name: String) : Int = {
-    // size of stack frames previous to the one where name is located
-    var prevScopeSizes = 0
-    // the offset in bytes
-    var result = 0
-    // whether the variable is in scope
-    var varFound = false
-
-    for (sF <- stackFrames.reverse) {
-      if (!varFound) {
-        sF.findVar(name) match {
-          case Some(x) =>
-             varFound = true
-            result = x
-          case None =>
-        }
-      }
-      if (!varFound) {
-        if(sF.isFunction) {
-          // goes past all variables and params on stack frame
-          // extra 2* WORD_SIZE is for the push(lr) and push(fp) per stack frame
-          prevScopeSizes += sF.pushedArgsSize + sF.localVarSize + 2 * WORD_SIZE
-        } else {
-          // goes past all variables on stack frame
-          // extra WORD_SIZE is for the push(fp) per stack frame
-          prevScopeSizes += sF.localVarSize + WORD_SIZE
-
-        }
-      }
-    }
-    if (!varFound) {
-      throw new Exception(s"Couldn't find variable \'$name\' on stack!")
-    }
-    prevScopeSizes + result
-  }
-}
- */

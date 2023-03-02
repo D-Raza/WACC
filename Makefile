@@ -1,5 +1,4 @@
-milestone := "wacc_examples/valid/@(basic|variables)"
-
+milestone := "wacc_examples/valid/@(basic|sequence|variables|IO|if|while)"
 all: lint test build
 
 lint:

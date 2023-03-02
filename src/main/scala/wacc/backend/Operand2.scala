@@ -3,12 +3,13 @@ import ShiftType._
 
 trait Operand2 {
   def putOnStack(offset: Int): Operand2 = this match {
-    case OffsetMode(baseReg, auxReg, shiftType, _) =>
-      OffsetMode(baseReg, auxReg, shiftType, ImmVal(offset))
-    case PostIndexedMode(baseReg, auxReg, shiftType, shiftAmount) =>
-      PostIndexedMode(baseReg, auxReg, shiftType, ImmVal(offset))
-    case PreIndexedMode(baseReg, auxReg, shiftType, shiftAmount) =>
-      PreIndexedMode(baseReg, auxReg, shiftType, ImmVal(offset))
+    case ImmVal(curOff) => ImmVal(-offset + curOff)
+    case OffsetMode(baseReg, auxReg, shiftType, ImmVal(curOff)) =>
+      OffsetMode(baseReg, auxReg, shiftType, ImmVal(-offset + curOff))
+    case PostIndexedMode(baseReg, auxReg, shiftType, ImmVal(curOff)) =>
+      PostIndexedMode(baseReg, auxReg, shiftType, ImmVal(-offset + curOff))
+    case PreIndexedMode(baseReg, auxReg, shiftType, ImmVal(curOff)) =>
+      PreIndexedMode(baseReg, auxReg, shiftType, ImmVal(-offset + curOff))
     case _ => this
   }
 }

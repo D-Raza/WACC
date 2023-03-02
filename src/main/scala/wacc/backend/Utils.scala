@@ -1,6 +1,6 @@
 package wacc.backend
 import wacc.backend._
-import wacc.backend.Globals.WORD_SIZE
+import wacc.backend.Globals.{WORD_SIZE, CHAR_SIZE}
 import wacc.backend.Condition.NE
 
 import scala.collection.mutable
@@ -13,13 +13,19 @@ object Utils {
   var printBoolFlag = false
   var printlnFlag = false
   var printRefFlag = false
-  var readIntFlag = false 
+  var readIntFlag = false
   var readCharFlag = false
+  var intErrOverflowFlag = false
+  var intErrDivZeroFlag = false
 
   def addUtils()(implicit
       instructions: mutable.ListBuffer[Instruction]
   ): Unit = {
-    if (printStringFlag) {
+    if (
+      printStringFlag
+      || intErrOverflowFlag
+      || intErrDivZeroFlag
+    ) {
       printString()
     }
     if (printIntFlag) {
@@ -40,9 +46,16 @@ object Utils {
     if (readCharFlag) {
       readChar()
     }
+    if (intErrOverflowFlag) {
+      intErrOverflow()
+    }
+    if (intErrDivZeroFlag) {
+      intErrDivZero()
+    }
+
   }
 
-  def printString()(implicit
+  private def printString()(implicit
       instructions: mutable.ListBuffer[Instruction]
   ): Unit = {
     instructions.addAll(
@@ -65,7 +78,7 @@ object Utils {
     )
   }
 
-  def printInt()(implicit
+  private def printInt()(implicit
       instructions: mutable.ListBuffer[Instruction]
   ): Unit = {
     instructions.addAll(
@@ -87,7 +100,7 @@ object Utils {
     )
   }
 
-  def printChar()(implicit
+  private def printChar()(implicit
       instructions: mutable.ListBuffer[Instruction]
   ): Unit = {
     instructions.addAll(
@@ -109,7 +122,8 @@ object Utils {
     )
 
   }
-  def printBool()(implicit
+
+  private def printBool()(implicit
       instructions: mutable.ListBuffer[Instruction]
   ): Unit = {
     instructions.addAll(
@@ -192,25 +206,6 @@ object Utils {
     )
   }
 
-//   .data
-// 51	@ length of .L._readi_str0
-// 52		.word 2
-// 53	.L._readi_str0:
-// 54		.asciz "%d"
-// 55	.text
-// 56	_readi:
-// 57		@ R0 contains the "original" value of the destination of the read
-// 58		push {lr}
-// 59		@ allocate space on the stack to store the read and place the original value there
-// 60		@ if scanf cannot read because of EOF, the read will appear to do nothing
-// 61		str r0, [sp, #-4]! @ push {r0}
-// 62		mov r1, sp
-// 63		ldr r0, =.L._readi_str0
-// 64		bl scanf
-// 65		ldr r0, [sp, #0]
-// 66		add sp, sp, #4
-// 67		pop {pc}
-
   private def readChar()(implicit
       instructions: mutable.ListBuffer[Instruction]
   ): Unit = {
@@ -219,17 +214,65 @@ object Utils {
         Directive("data"),
         Directive("    word 2"),
         Label(".L._readc_str0"),
-        Directive(s"    asciz \"%c\""),
+        Directive(s"    asciz \" %c\""),
         Directive("text"),
         Label("_readc"),
         Push(List(LR)),
         // str r0 [sp, #-4]!
-        StoreByte(R0, PostIndexedMode(SP, shiftAmount = ImmVal(-1))),
+        StoreByte(R0, PostIndexedMode(SP, shiftAmount = ImmVal(-CHAR_SIZE))),
+        Move(R1, SP),
+        // ldr r0, .L._readc_str0
+        Load(R0, LabelOp(".L._readc_str0")),
         BranchAndLink("scanf"),
-        // ldrsb r0, [sp, #0]
         LoadByte(R0, OffsetMode(SP, shiftAmount = ImmVal(0))),
-        AddInstr(SP, SP, ImmVal(WORD_SIZE)),
+        AddInstr(SP, SP, ImmVal(CHAR_SIZE)),
         Pop(List(PC))
+      )
+    )
+  }
+
+  private def intErrOverflow()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): Unit = {
+    instructions.addAll(
+      List(
+        Directive("data"),
+        Comment("length of .L._errOverflow_str0"),
+        Directive("    word 52"),
+        Label(".L._errOverflow_str0"),
+        Directive(
+          s"    asciz \"fatal error: integer overflow or underflow occurred\n\""
+        ),
+        Directive("text"),
+        Label("_errOverflow"),
+        // ldr r0, .L._errOverflow_str0
+        Load(R0, LabelOp(".L._errOverflow_str0")),
+        BranchAndLink("_prints"),
+        Move(R0, ImmVal(255)),
+        BranchAndLink("exit")
+      )
+    )
+  }
+
+  private def intErrDivZero()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): Unit = {
+    instructions.addAll(
+      List(
+        Directive("data"),
+        Comment("length of .L._errDivByZero_str0"),
+        Directive("    word 40"),
+        Label(".L._errDivByZero_str0"),
+        Directive(
+          s"    asciz \"fatal error: division or modulo by zero occurred\n\""
+        ),
+        Directive("text"),
+        Label("_errDivByZero"),
+        // ldr r0, .L._errDivByZero_str0
+        Load(R0, LabelOp(".L._errDivByZero_str0")),
+        BranchAndLink("_prints"),
+        Move(R0, ImmVal(255)),
+        BranchAndLink("exit")
       )
     )
   }

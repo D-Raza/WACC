@@ -11,8 +11,18 @@ sealed trait Instruction {
       Load(destReg, addrMode.putOnStack(offset), cond)
     case Store(srcReg, addrMode, cond) =>
       Store(srcReg, addrMode.putOnStack(offset), cond)
+    case StoreByte(srcReg, addrMode, cond) =>
+      StoreByte(srcReg, addrMode.putOnStack(offset), cond)
+    case SubInstr(destReg, operand1, operand2, cond, flag) =>
+      SubInstr(destReg, operand1, operand2.putOnStack(-offset), cond, flag)
     case _ => this
   }
+}
+
+case class PendingStackOffset(instruction: Instruction) extends Instruction {
+  override def opsToString: String =
+    instruction.opsToString + " @ PENDING STACK OFFSET"
+  override val opcode: String = instruction.opcode
 }
 
 // Arithmetic instructions
@@ -105,7 +115,7 @@ case class XorInstr(
 // Data transfer instructions
 case class Move(destReg: Register, operand: Operand2, cond: Condition = AL)
     extends Instruction {
-  override val opcode = "mov"
+  override val opcode = "mov" + cond
   override def opsToString: String = s"$destReg, $operand"
 }
 
@@ -127,8 +137,7 @@ case class Load(destReg: Register, operand: Operand2, cond: Condition = AL)
   override def opsToString: String = s"$destReg, $operand"
 }
 
-// ldrsb
-case class LoadByte(destReg: Register, operand: Operand2, cond: Condition = AL) 
+case class LoadByte(destReg: Register, operand: Operand2, cond: Condition = AL)
     extends Instruction {
   override val opcode = "ldrsb"
   override def opsToString: String = s"$destReg, $operand"

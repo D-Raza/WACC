@@ -159,8 +159,8 @@ object SemanticAnalyser {
         printTable ++= lValPrintTable
 
         lValueType match {
-          case IntType()   => printTable += (lValue.pos -> lValueType)
-          case CharType()  => printTable += (lValue.pos -> lValueType)
+          case IntType()  => printTable += (lValue.pos -> lValueType)
+          case CharType() => printTable += (lValue.pos -> lValueType)
           case _ =>
             errors += TypeMismatchError.genError(
               lValueType,
