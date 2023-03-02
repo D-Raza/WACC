@@ -38,7 +38,13 @@ case class PostIndexedMode(
     auxReg: Option[Register] = None,
     shiftType: Option[ShiftType] = None,
     shiftAmount: ImmVal = ImmVal(0)
-) extends AddressingMode
+) extends AddressingMode {
+  override def toString: String = {
+    s"[${baseReg.toString()}${auxReg.map(r => s", ${r.toString()}").getOrElse("")}${shiftType
+        .map(s => s", ${s.toString}")
+        .getOrElse("")}, ${shiftAmount.toString()}]!"
+  }
+}
 
 case class PreIndexedMode(
     baseReg: Register,

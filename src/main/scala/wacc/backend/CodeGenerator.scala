@@ -123,10 +123,30 @@ object CodeGenerator {
         //    OffsetMode(state.getScratchReg.get))
       }
 
-      case Read(_) => () // TODO
+      case Read(lValue: LValue) => 
+        instructions ++= compileLValue(lValue, R0)
+        printTable.get(lValue.pos) match {
+          case Some(IntType()) => {
+             if (!Utils.readIntFlag) {
+              Utils.readIntFlag = true
+              labels.addDataMsg("%d\u0000")
+            } 
+            instructions += BranchAndLink("_readi")
+          }
+
+          case Some(CharType()) => {
+            if (!Utils.readCharFlag) {
+              Utils.readCharFlag = true
+              labels.addDataMsg("%c\u0000")
+            }
+            instructions += BranchAndLink("_readc")
+          }
+
+          case _ => 
+        }
 
       case Free(_) => () // TODO
-
+ 
       case Return(expr) => instructions ++= compileExpr(expr, R0)
 
       case Exit(expr) => {

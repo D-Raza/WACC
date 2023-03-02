@@ -13,6 +13,8 @@ object Utils {
   var printBoolFlag = false
   var printlnFlag = false
   var printRefFlag = false
+  var readIntFlag = false 
+  var readCharFlag = false
 
   def addUtils()(implicit
       instructions: mutable.ListBuffer[Instruction]
@@ -31,6 +33,12 @@ object Utils {
     }
     if (printlnFlag) {
       printLine()
+    }
+    if (readIntFlag) {
+      readInt()
+    }
+    if (readCharFlag) {
+      readChar()
     }
   }
 
@@ -153,6 +161,74 @@ object Utils {
         BranchAndLink("puts"),
         Move(R0, ImmVal(0)),
         BranchAndLink("fflush"),
+        Pop(List(PC))
+      )
+    )
+  }
+
+  private def readInt()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): Unit = {
+    instructions.addAll(
+      List(
+        Directive("data"),
+        Directive("    word 2"),
+        Label(".L._readi_str0"),
+        Directive(s"    asciz \"%d\""),
+        Directive("text"),
+        Label("_readi"),
+        Push(List(LR)),
+        // str r0 [sp, #-4]!
+        Store(R0, PostIndexedMode(SP, shiftAmount = ImmVal(-WORD_SIZE))),
+        Move(R1, SP),
+        // ldr r0, .L._readi_str0
+        Load(R0, LabelOp(".L._readi_str0")),
+        BranchAndLink("scanf"),
+        // ldr r0, [sp, #0]
+        Load(R0, OffsetMode(SP, shiftAmount = ImmVal(0))),
+        AddInstr(SP, SP, ImmVal(WORD_SIZE)),
+        Pop(List(PC))
+      )
+    )
+  }
+
+//   .data
+// 51	@ length of .L._readi_str0
+// 52		.word 2
+// 53	.L._readi_str0:
+// 54		.asciz "%d"
+// 55	.text
+// 56	_readi:
+// 57		@ R0 contains the "original" value of the destination of the read
+// 58		push {lr}
+// 59		@ allocate space on the stack to store the read and place the original value there
+// 60		@ if scanf cannot read because of EOF, the read will appear to do nothing
+// 61		str r0, [sp, #-4]! @ push {r0}
+// 62		mov r1, sp
+// 63		ldr r0, =.L._readi_str0
+// 64		bl scanf
+// 65		ldr r0, [sp, #0]
+// 66		add sp, sp, #4
+// 67		pop {pc}
+
+  private def readChar()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): Unit = {
+    instructions.addAll(
+      List(
+        Directive("data"),
+        Directive("    word 2"),
+        Label(".L._readc_str0"),
+        Directive(s"    asciz \"%c\""),
+        Directive("text"),
+        Label("_readc"),
+        Push(List(LR)),
+        // str r0 [sp, #-4]!
+        StoreByte(R0, PostIndexedMode(SP, shiftAmount = ImmVal(-1))),
+        BranchAndLink("scanf"),
+        // ldrsb r0, [sp, #0]
+        LoadByte(R0, OffsetMode(SP, shiftAmount = ImmVal(0))),
+        AddInstr(SP, SP, ImmVal(WORD_SIZE)),
         Pop(List(PC))
       )
     )

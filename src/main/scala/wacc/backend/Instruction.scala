@@ -127,6 +127,13 @@ case class Load(destReg: Register, operand: Operand2, cond: Condition = AL)
   override def opsToString: String = s"$destReg, $operand"
 }
 
+// ldrsb
+case class LoadByte(destReg: Register, operand: Operand2, cond: Condition = AL) 
+    extends Instruction {
+  override val opcode = "ldrsb"
+  override def opsToString: String = s"$destReg, $operand"
+}
+
 case class Pop(srcRegs: List[Register], cond: Condition = AL)
     extends Instruction {
   val opcode: String = "pop"
