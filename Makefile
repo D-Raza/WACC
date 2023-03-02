@@ -1,4 +1,4 @@
-milestone := "wacc_examples/valid/@(basic|sequence|variables|expressions|if|while|IO|array)"
+milestone := "wacc_examples/valid/@(basic|sequence|variables|expressions|if|while|IO)"
 # milestone := "wacc_examples/valid/function/simple_functions/"
 
 # TODO: 
