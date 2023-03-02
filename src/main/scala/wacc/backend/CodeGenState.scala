@@ -59,7 +59,8 @@ case class CodeGenState() {
   val scratchRegs: mutable.Stack[Register] =
     mutable.Stack(R4, R5, R6, R7, R0, R1, R2, R3)
   val tmp: Register = R8
-  val tmp2: Register = IP
+  val tmp2: Register = R9
+  val tmp3: Register = IP
 
   def getScratchReg: Option[Register] =
     if (scratchRegs.isEmpty) None else Some(scratchRegs.pop())

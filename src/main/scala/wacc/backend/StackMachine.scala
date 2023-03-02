@@ -11,7 +11,6 @@ object StackMachine {
   def addDeclaration(ident: Ident, size: Int): Int = {
     val currStackFrame = stackFrameList.last
     currStackFrame.declaredVarMap += (ident -> currStackFrame.currVarOffset)
-    println("Adding declaration: " + ident + " " + currStackFrame.currVarOffset)
 
     currStackFrame.currVarOffset += size
 

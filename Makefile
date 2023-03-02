@@ -1,4 +1,9 @@
-milestone := "wacc_examples/valid/@(basic|sequence|variables|IO|if|while)"
+milestone := "wacc_examples/valid/@(basic|sequence|variables|expressions|if|while|IO|array)"
+# milestone := "wacc_examples/valid/function/simple_functions/"
+
+# TODO: 
+# array, function, scope, runtimeErr, pairs, advanced
+
 all: lint test build
 
 lint:

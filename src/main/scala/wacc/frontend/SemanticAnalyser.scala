@@ -60,9 +60,9 @@ object SemanticAnalyser {
         errors ++= statErrors
         localSymbolTable ++= statSymbolTable
         localPrintTable ++= statPrintTable
-        println(statSymbolTable)
 
     }
+    program.functionTable = functionDefs.toMap
     program.symbolTable = localSymbolTable.toMap
     program.printTable ++= localPrintTable
     (errors.toList)
@@ -572,12 +572,14 @@ object SemanticAnalyser {
 
         symbolTable get ident match {
           case Some(t @ ArrayType(innerType)) =>
+            println("Entering ArrayElem case with ident: " + ident + " and t: " + t)
             val (argTypes, argErrors, pt) =
               xs.map(evalTypeOfExpr(_)).unzip3
             errors ++= argErrors.flatten
             printTable ++= pt.foldLeft(Map.empty: Map[(Int, Int), Type]) {
-              (acc, m) => acc ++ m
+              (acc, m) => (acc ++ m.toMap)
             }
+            println("SEMANTIC PRINT TABLE: " + printTable)
             if (xs.length > getArrayTypeRank(t))
               (
                 ErrorType()(ident.pos),
@@ -586,10 +588,11 @@ object SemanticAnalyser {
                   getArrayTypeRank(t),
                   ident.pos
                 )).toList,
-                printTable
+                printTable.toMap
               )
 
-            argTypes.zipWithIndex.foreach { case (argType, i) =>
+            argTypes.zipWithIndex.foreach { 
+             case (argType, i) =>
               if (!(argType equiv IntType()(NULLPOS)))
                 (
                   ErrorType()(ident.pos),
@@ -599,7 +602,7 @@ object SemanticAnalyser {
                     xs.toIndexedSeq(i).pos,
                     s"array access for $ident"
                   ),
-                  printTable
+                  printTable.toMap
                 )
             }
 
@@ -722,7 +725,7 @@ object SemanticAnalyser {
           expr.pos,
           ""
         ),
-        printTable
+        printTable.toMap
       )
     }
   }
@@ -767,7 +770,7 @@ object SemanticAnalyser {
           expr1.pos,
           ""
         ),
-        printTable
+        printTable.toMap
       )
     } else if (!argTypes.exists(expr2Type equiv _)) {
       (
@@ -778,7 +781,7 @@ object SemanticAnalyser {
           expr2.pos,
           ""
         ), // Set(expr1Type)
-        printTable
+        printTable.toMap
       )
     } else if (!((expr1Type equiv expr2Type) || (expr2Type equiv expr1Type))) {
       (
@@ -789,11 +792,11 @@ object SemanticAnalyser {
           expr2.pos,
           ""
         ),
-        printTable
+        printTable.toMap
       )
     } else {
 
-      (retType, errors, printTable)
+      (retType, errors, printTable.toMap)
     }
   }
 
@@ -826,7 +829,7 @@ object SemanticAnalyser {
         val errors = evals.flatMap(_._2)
         val pts = evals.map(_._3)
         printTable ++= pts.foldLeft(Map.empty: Map[(Int, Int), Type]) {
-          (acc, m) => acc ++ m
+          (acc, m) => (acc ++ m.toMap)
         }
         if (types.distinct.length == 1 && (types.head equiv expectedType)) {
           (types.head, errors, printTable.toMap)

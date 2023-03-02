@@ -43,6 +43,8 @@ if [ $no_files -lt 2 ]; then
     exit 1
 fi
 
+
+
 echo -e "\e[1;35m-----\e[0m \e[1;4;35mWACC Tests\e[0m \e[1;35m-----\e[0m" | tee -a >(sed -r 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[m|K]//g' > $LOGFILE)
 echo -e "\e[1;35mRunning $no_files tests in $dir\e[0m" | tee -a >(sed -r 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[m|K]//g' > $LOGFILE)
 
@@ -58,7 +60,7 @@ test_task() {
 
     expected_output=""
     if grep -q '# Output:' $file; then 
-        expected_output=$(awk '/^# Output/{getline; p=1} p && /^#/ {print substr($0, 3); next} /^$/ {p=0}' $file | awk 'NR>1{print PREV} {PREV=$0} END{printf("%s",$0)}'; r=$?; echo /; exit "$r")
+        expected_output=$(awk '/^# Output/{getline; p=1} p && /^#/ {print substr($0, 3); next} /^$/ {p=0}' $file | sed -e '/Program:/d' | awk 'NR>1{print PREV} {PREV=$0} END{printf("%s",$0)}'; r=$?; echo /; exit "$r")
         expected_output=${expected_output%/}
     fi
 
@@ -97,7 +99,8 @@ test_task() {
                     emulator_output=${emulator_output%/}
                     if [ $emulator_exit_code -eq $expected_runtime_exit_code ]; then
                         if [ ! -z "$expected_output" ]; then
-                            output_diff=$(diff <(echo "$emulator_output") <(echo "$expected_output"))
+                            output_diff=$(diff -b <(echo "$expected_output" | grep -vE '#addrs#') <(echo "$emulator_output" | grep -vE '0x'))
+                            # if [ "${emulator_output}" == "${expected_output}" ]; then
                             if [ -z "$output_diff" ]; then
                                 test_result="\e[1;32m[PASS]\e[0m \e[32m$file\e[0m"
                             else
@@ -136,10 +139,9 @@ test_task() {
         echo
     fi
 
-    # if [ ! -z "$emulator_output" ]; then
-    if [ "$emulator_output" != "$expected_output" ]; then
+    # if [ "$emulator_output" != "$expected_output" ]; then
+    if [ ! -z "$output_diff" ]; then
         echo -e "\e[34m--- Emulator Output Difference ---\e[0m"
-        echo "$emulator_output"
         echo "$output_diff"
         echo
     fi

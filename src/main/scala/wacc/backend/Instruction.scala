@@ -1,6 +1,7 @@
 package wacc.backend
 import Condition._
 import Flag._
+import ShiftType._
 
 sealed trait Instruction {
   def opsToString: String
@@ -20,8 +21,7 @@ sealed trait Instruction {
 }
 
 case class PendingStackOffset(instruction: Instruction) extends Instruction {
-  override def opsToString: String =
-    instruction.opsToString + " @ PENDING STACK OFFSET"
+  override def opsToString: String = instruction.opsToString + " @ PENDING STACK OFFSET"
   override val opcode: String = instruction.opcode
 }
 
@@ -33,7 +33,7 @@ case class AddInstr(
     cond: Condition = AL,
     flag: Option[Flag] = None
 ) extends Instruction {
-  override val opcode = "add"
+  override val opcode = "adds"
   override def opsToString: String = s"$destReg, $operand1, $operand2"
 }
 
@@ -44,7 +44,7 @@ case class SubInstr(
     cond: Condition = AL,
     flag: Option[Flag] = None
 ) extends Instruction {
-  override val opcode: String = "sub"
+  override val opcode: String = "subs"
   override def opsToString: String = s"$destReg, $operand1, $operand2"
 
 }
@@ -137,7 +137,7 @@ case class Load(destReg: Register, operand: Operand2, cond: Condition = AL)
   override def opsToString: String = s"$destReg, $operand"
 }
 
-case class LoadByte(destReg: Register, operand: Operand2, cond: Condition = AL)
+case class LoadByte(destReg: Register, operand: Operand2, cond: Condition = AL) 
     extends Instruction {
   override val opcode = "ldrsb"
   override def opsToString: String = s"$destReg, $operand"
@@ -203,4 +203,25 @@ case class Cmp(srcReg: Register, operand: Operand2, cond: Condition = AL)
     extends Instruction {
   override def opsToString: String = s"$srcReg, $operand"
   override val opcode = "cmp"
+}
+
+// cmp rdHi, rdLo, asr #31
+case class CmpShift(srcReg: Register, operand: Operand2, shift: ShiftType, operand2: Operand2) extends Instruction {
+  override def opsToString: String = s"$srcReg, $operand, $shift $operand2"
+  override val opcode = "cmp"
+  override def toString: String = s"\t$opcode $opsToString"
+}
+
+// ldr r3,[r3,r10,lsl,#2]
+case class LdrShift(destReg: Register, operand1: Operand2, operand2: Operand2, shift: ShiftType, operand3: Operand2) extends Instruction {
+  override def opsToString: String = s"$destReg, [${operand1}, $operand2, $shift ${operand3}]"
+  override val opcode = "ldr"
+  override def toString: String = s"\t$opcode $opsToString"
+}
+
+// str r8,[r3,r10,lsl,#2]
+case class StrShift(destReg: Register, operand1: Operand2, operand2: Operand2, shift: ShiftType, operand3: Operand2) extends Instruction {
+  override def opsToString: String = s"$destReg, [${operand1}, $operand2, $shift ${operand3}]"
+  override val opcode = "str"
+  override def toString: String = s"\t$opcode $opsToString"
 }

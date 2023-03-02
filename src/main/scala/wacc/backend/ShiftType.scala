@@ -5,5 +5,10 @@ object ShiftType extends Enumeration {
 
   /* Right Arithmetic Shift (ASR), Left Arithmetic Shift (ASL),
        Left Logical Shift (LSL), Right Logical Shift (LSR), Rotate Right (ROR) */
-  val ASR, ASL, LSL, LSR, ROR = Value
+  val ASR = Value("asr")
+  val ASL = Value("asl")
+  val LSL = Value("lsl")
+  val LSR = Value("lsr")
+  val ROR = Value("ror")
+
 }
