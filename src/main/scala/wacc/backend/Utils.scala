@@ -1,26 +1,26 @@
 package wacc.backend
 import wacc.backend._
-import wacc.backend.Globals.{WORD_SIZE, CHAR_SIZE} 
+import wacc.backend.Globals.{WORD_SIZE, CHAR_SIZE}
 import wacc.backend.Condition.{NE, EQ}
 
 import scala.collection.mutable
 
 object Utils {
 
-  var printStringFlag     = false
-  var printIntFlag        = false
-  var printCharFlag       = false
-  var printBoolFlag       = false
-  var printlnFlag         = false
-  var printRefFlag        = false
-  var printPFlag          = false
-  var readIntFlag         = false 
-  var readCharFlag        = false
-  var intErrOverflowFlag  = false
-  var intErrDivZeroFlag   = false
-  var arrayFlag           = false
-  var freePairFlag        = false
-  var errNullFlag         = false
+  var printStringFlag = false
+  var printIntFlag = false
+  var printCharFlag = false
+  var printBoolFlag = false
+  var printlnFlag = false
+  var printRefFlag = false
+  var printPFlag = false
+  var readIntFlag = false
+  var readCharFlag = false
+  var intErrOverflowFlag = false
+  var intErrDivZeroFlag = false
+  var arrayFlag = false
+  var freePairFlag = false
+  var errNullFlag = false
 
   def addUtils()(implicit
       instructions: mutable.ListBuffer[Instruction]
@@ -33,9 +33,11 @@ object Utils {
       printStringFlag = true
       errNull()
     }
-    if (printStringFlag 
-        || intErrOverflowFlag
-        || intErrDivZeroFlag) {
+    if (
+      printStringFlag
+      || intErrOverflowFlag
+      || intErrDivZeroFlag
+    ) {
       printString()
     }
     if (printIntFlag) {
@@ -199,25 +201,26 @@ object Utils {
   }
 
   private def printP()(implicit
-      instructions: mutable.ListBuffer[Instruction]): Unit = {
-        instructions.addAll(
-          List(
-            Directive("data"),
-            Directive("    word 2"),
-            Label(".L._printp_str0"),
-            Directive(s"    asciz \"%p\""),
-            Directive("text"),
-            Label("_printp"),
-            Push(List(LR)),
-            Move(R1, R0),
-            Load(R0, LabelOp(".L._printp_str0")),
-            BranchAndLink("printf"),
-            Move(R0, ImmVal(0)),
-            BranchAndLink("fflush"),
-            Pop(List(PC))
-          )
-        )
-      }
+      instructions: mutable.ListBuffer[Instruction]
+  ): Unit = {
+    instructions.addAll(
+      List(
+        Directive("data"),
+        Directive("    word 2"),
+        Label(".L._printp_str0"),
+        Directive(s"    asciz \"%p\""),
+        Directive("text"),
+        Label("_printp"),
+        Push(List(LR)),
+        Move(R1, R0),
+        Load(R0, LabelOp(".L._printp_str0")),
+        BranchAndLink("printf"),
+        Move(R0, ImmVal(0)),
+        BranchAndLink("fflush"),
+        Pop(List(PC))
+      )
+    )
+  }
 
   private def readInt()(implicit
       instructions: mutable.ListBuffer[Instruction]
@@ -279,7 +282,9 @@ object Utils {
         Comment("length of .L._errOverflow_str0"),
         Directive("    word 52"),
         Label(".L._errOverflow_str0"),
-        Directive(s"    asciz \"fatal error: integer overflow or underflow occurred\""),
+        Directive(
+          s"    asciz \"fatal error: integer overflow or underflow occurred\""
+        ),
         Directive("text"),
         Label("_errOverflow"),
         // ldr r0, .L._errOverflow_str0
@@ -344,7 +349,9 @@ object Utils {
         Directive("data"),
         Directive("    word 44"),
         Label(".L._errNull_str0"),
-        Directive(s"    asciz \"fatal error: null pair dereferenced or freed\""),
+        Directive(
+          s"    asciz \"fatal error: null pair dereferenced or freed\""
+        ),
         Directive("text"),
         Label("_errNull"),
         // ldr r0, .L._errNull_str0
@@ -356,7 +363,9 @@ object Utils {
     )
   }
 
-  private def arrStore()(implicit instructions: mutable.ListBuffer[Instruction]): Unit = {
+  private def arrStore()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): Unit = {
     instructions.addAll(
       List(
         /* @ Special calling convention: array ptr passed in R3, index in R10,
@@ -371,12 +380,14 @@ object Utils {
         Move(R1, R10, Condition.GE),
         BranchAndLink("_boundsCheck", Condition.GE),
         // str r8, [r3, r10, lsl #2]
-        StrShift(R8, R3, R10, ShiftType.LSL,  ImmVal(2)),
+        StrShift(R8, R3, R10, ShiftType.LSL, ImmVal(2)),
         Pop(List(PC))
       )
     )
   }
-  private def arrLoad()(implicit instructions: mutable.ListBuffer[Instruction]): Unit = {
+  private def arrLoad()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): Unit = {
     instructions.addAll(
       List(
         Label("_arrLoad"),
@@ -388,13 +399,21 @@ object Utils {
         Cmp(R10, LR),
         Move(R1, R10, Condition.GE),
         BranchAndLink("_boundsCheck", Condition.GE),
-        LdrShift(R3, R3, R10, ShiftType.LSL, ImmVal(2)), // ldr r3, [r3, r10, lsl #2]
+        LdrShift(
+          R3,
+          R3,
+          R10,
+          ShiftType.LSL,
+          ImmVal(2)
+        ), // ldr r3, [r3, r10, lsl #2]
         Pop(List(PC))
       )
     )
   }
 
-  private def boundsCheck()(implicit instructions: mutable.ListBuffer[Instruction]): Unit = {
+  private def boundsCheck()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): Unit = {
     instructions.addAll(
       List(
         Directive("data"),
@@ -412,9 +431,5 @@ object Utils {
       )
     )
   }
-
-
-
-
 
 }

@@ -182,8 +182,8 @@ object AST {
 
   /* Case Classes and Traits */
   case class Program(funcs: List[Func], stat: List[Stat])(val pos: (Int, Int)) {
-    var symbolTable:   Map[Ident, Type]               = Map.empty
-    var printTable:    Map[(Int, Int), Type]          = Map.empty
+    var symbolTable: Map[Ident, Type] = Map.empty
+    var printTable: Map[(Int, Int), Type] = Map.empty
     var functionTable: Map[Ident, (Type, List[Type])] = Map.empty
   }
 

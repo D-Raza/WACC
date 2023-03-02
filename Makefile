@@ -4,7 +4,7 @@ milestone := "wacc_examples/valid/@(basic|sequence|variables|expressions|if|whil
 # TODO: 
 # array, function, scope, runtimeErr, pairs, advanced
 
-all: lint test build
+all: build
 
 lint:
 	sbt scalafmtCheck

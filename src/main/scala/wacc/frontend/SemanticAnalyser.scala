@@ -572,7 +572,9 @@ object SemanticAnalyser {
 
         symbolTable get ident match {
           case Some(t @ ArrayType(innerType)) =>
-            println("Entering ArrayElem case with ident: " + ident + " and t: " + t)
+            println(
+              "Entering ArrayElem case with ident: " + ident + " and t: " + t
+            )
             val (argTypes, argErrors, pt) =
               xs.map(evalTypeOfExpr(_)).unzip3
             errors ++= argErrors.flatten
@@ -591,8 +593,7 @@ object SemanticAnalyser {
                 printTable.toMap
               )
 
-            argTypes.zipWithIndex.foreach { 
-             case (argType, i) =>
+            argTypes.zipWithIndex.foreach { case (argType, i) =>
               if (!(argType equiv IntType()(NULLPOS)))
                 (
                   ErrorType()(ident.pos),
