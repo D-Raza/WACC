@@ -225,13 +225,15 @@ object SemanticAnalyser {
         val (exprType, exprTypeErrors, exprPrintTable) = evalTypeOfExpr(expr)
         errors ++= exprTypeErrors
         printTable ++= exprPrintTable
-        (if (!printTable.contains(expr.pos)) printTable.addOne(expr.pos, exprType))
+        (if (!printTable.contains(expr.pos))
+           printTable.addOne(expr.pos, exprType))
 
       case Println(expr) =>
         val (exprType, exprTypeErrors, exprPrintTable) = evalTypeOfExpr(expr)
         errors ++= exprTypeErrors
         printTable ++= exprPrintTable
-        (if (!printTable.contains(expr.pos)) printTable.addOne(expr.pos, exprType))
+        (if (!printTable.contains(expr.pos))
+           printTable.addOne(expr.pos, exprType))
 
       case ifNode @ If(cond, thenStat, elseStat) =>
         val (condType, condTypeErrors, condPrintTable) = evalTypeOfExpr(cond)
@@ -580,7 +582,7 @@ object SemanticAnalyser {
             }
 
             var currType: Type = t
-            var currRank = xs.length           
+            var currRank = xs.length
             while (currRank > 0) {
               currType match {
                 case ArrayType(innerType) =>
@@ -591,13 +593,13 @@ object SemanticAnalyser {
                     xs.length,
                     getArrayTypeRank(t),
                     ident.pos
-                    )
+                  )
                   currRank = 0
               }
             }
             printTable += (array.pos -> currType)
             array.actualSize = currType.size
-                  
+
             argTypes.zipWithIndex.foreach { case (argType, i) =>
               if (!(argType equiv IntType()(NULLPOS)))
                 (

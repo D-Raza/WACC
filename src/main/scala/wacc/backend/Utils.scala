@@ -389,26 +389,26 @@ object Utils {
 
   private def arrStoreB()(implicit
       instructions: mutable.ListBuffer[Instruction]
-      ): Unit = {
+  ): Unit = {
 
-        instructions.addAll(
-          List(
-            Label("_arrStoreB"),
-            Push(List(LR)),
-            Cmp(R10, ImmVal(0)),
-            Move(R1, R10, Condition.LT),
-            BranchAndLink("_boundsCheck", Condition.LT),
-            Load(LR, OffsetMode(baseReg = R3, shiftAmount = ImmVal(-4))),
-            Cmp(R10, LR),
-            Move(R1, R10, Condition.GE),
-            BranchAndLink("_boundsCheck", Condition.GE),
-            // strb r8, [r3, r10]
-            StoreByte(R8, PreIndexedMode(baseReg = R3, auxReg = Some(R10))),
-            Pop(List(PC))
-          )
-        )
+    instructions.addAll(
+      List(
+        Label("_arrStoreB"),
+        Push(List(LR)),
+        Cmp(R10, ImmVal(0)),
+        Move(R1, R10, Condition.LT),
+        BranchAndLink("_boundsCheck", Condition.LT),
+        Load(LR, OffsetMode(baseReg = R3, shiftAmount = ImmVal(-4))),
+        Cmp(R10, LR),
+        Move(R1, R10, Condition.GE),
+        BranchAndLink("_boundsCheck", Condition.GE),
+        // strb r8, [r3, r10]
+        StoreByte(R8, PreIndexedMode(baseReg = R3, auxReg = Some(R10))),
+        Pop(List(PC))
+      )
+    )
 
-      }
+  }
 
   private def arrLoad()(implicit
       instructions: mutable.ListBuffer[Instruction]

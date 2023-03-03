@@ -122,7 +122,7 @@ object CodeGenerator {
       case Assign(lValue, rValue) => {
         instructions += Comment("Assign: compiling RVALUE " + rValue)
         instructions ++= compileRValue(rValue, state.tmp)
-        
+
         println("lValue: " + lValue + " size: " + getLValueSize(lValue))
         var assignByte = getLValueSize(lValue) == 1
         assignByte = assignByte || (rValue match {
@@ -130,14 +130,14 @@ object CodeGenerator {
             symbolTable.get(ident) match {
               case Some(BoolType()) => true
               case Some(CharType()) => true
-              case _ => false
+              case _                => false
             }
           }
           case _: BoolLiter => true
           case _: CharLiter => true
-          case _ => false
+          case _            => false
         })
-        
+
         lValue match {
           case ident: Ident => {
             state.identToReg.get(ident) match {
@@ -155,7 +155,9 @@ object CodeGenerator {
           case _: PairElem => {
             instructions += Comment("Assign: compiling LVALUE " + lValue)
             instructions ++= compileLValue(lValue, state.tmp2, assignByte)
-            instructions += (if (assignByte) StoreByte(state.tmp, OffsetMode(state.tmp2)) else Store(state.tmp, OffsetMode(state.tmp2)))
+            instructions += (if (assignByte)
+                               StoreByte(state.tmp, OffsetMode(state.tmp2))
+                             else Store(state.tmp, OffsetMode(state.tmp2)))
           }
           case _ => {
             instructions ++= compileLValue(lValue, state.tmp2, assignByte)
@@ -313,7 +315,14 @@ object CodeGenerator {
 
         instructions += Label(bodyLabel)
 
-        bodyStat.foreach(stat => instructions ++= compileStat(stat)(state, printTable, whileNode.symbolTable, labels))
+        bodyStat.foreach(stat =>
+          instructions ++= compileStat(stat)(
+            state,
+            printTable,
+            whileNode.symbolTable,
+            labels
+          )
+        )
 
         val condReg = state.getReg
 
@@ -366,7 +375,7 @@ object CodeGenerator {
               Store(
                 a_reg,
                 OffsetMode(arrayStartReg, shiftAmount = ImmVal(-4))
-                ),
+              )
             )
           )
 
@@ -385,7 +394,7 @@ object CodeGenerator {
         instructions ++= compileNewPair(expr1, expr2, resReg)
       case Call(_, _) =>
         instructions ++= compileFunctionCall(rValue.asInstanceOf[Call])
-      case expr: Expr     => instructions ++= compileExpr(expr, resReg)
+      case expr: Expr => instructions ++= compileExpr(expr, resReg)
       case pair: PairElem => {
         // instructions += Push(List(R8))
         instructions ++= getPairElem(pair, resReg, unpack = true)
@@ -396,7 +405,11 @@ object CodeGenerator {
     instructions
   }
 
-  private def getPairElem(pairElem: PairElem, resReg: Register, unpack: Boolean = false)(implicit
+  private def getPairElem(
+      pairElem: PairElem,
+      resReg: Register,
+      unpack: Boolean = false
+  )(implicit
       state: CodeGenState,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
@@ -408,7 +421,8 @@ object CodeGenerator {
     pairElem match {
       case Fst(lv) => {
         lv match {
-          case innerPair: PairElem => instructions ++= getPairElem(innerPair, state.tmp, unpack = true)
+          case innerPair: PairElem =>
+            instructions ++= getPairElem(innerPair, state.tmp, unpack = true)
           case arrayElem: ArrayElem => {
             instructions ++= compileLValue(arrayElem, state.tmp, load = true)
           }
@@ -430,7 +444,8 @@ object CodeGenerator {
 
       case Snd(lv) => {
         lv match {
-          case innerPair: PairElem => instructions ++= getPairElem(innerPair, state.tmp, unpack)
+          case innerPair: PairElem =>
+            instructions ++= getPairElem(innerPair, state.tmp, unpack)
           case arrayElem: ArrayElem => {
             instructions ++= compileLValue(arrayElem, state.tmp, load = true)
           }
@@ -440,7 +455,10 @@ object CodeGenerator {
         }
         instructions += Cmp(state.tmp, ImmVal(0))
         instructions += BranchAndLink("_errNull", Condition.EQ)
-        instructions += Load(state.tmp2, OffsetMode(state.tmp, shiftAmount = ImmVal(WORD_SIZE)))
+        instructions += Load(
+          state.tmp2,
+          OffsetMode(state.tmp, shiftAmount = ImmVal(WORD_SIZE))
+        )
 
         if (unpack) {
           instructions += (getLValueSize(lv) match {
@@ -450,11 +468,16 @@ object CodeGenerator {
         }
       }
     }
-    
+
     instructions
   }
-  
-  def compileLValue(lValue: LValue, resReg: Register, assignByte: Boolean = false, load: Boolean = false)(implicit
+
+  def compileLValue(
+      lValue: LValue,
+      resReg: Register,
+      assignByte: Boolean = false,
+      load: Boolean = false
+  )(implicit
       state: CodeGenState,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
@@ -484,8 +507,8 @@ object CodeGenerator {
           instructions += BranchAndLink("_arrLoad")
         } else {
           if (assignByte) {
-            instructions += BranchAndLink("_arrStoreB") 
-          } else { 
+            instructions += BranchAndLink("_arrStoreB")
+          } else {
             instructions += BranchAndLink("_arrStore")
           }
         }
@@ -510,49 +533,48 @@ object CodeGenerator {
       symbolTable: Map[Ident, Type],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
-      val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
-      
-      def compileExprForPair(expr: Expr): mutable.ListBuffer[Instruction] = {
-        val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
-        instructions ++= List(
-          Push(List(R0, R1)),
-          Move(R0, ImmVal(expr.size)),
-          BranchAndLink("malloc"),
-          Move(state.tmp3, R0),
-          Pop(List(R0, R1)),
-        )
+    val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
-        instructions ++= compileExpr(expr, state.tmp)
-
-        instructions ++= List(
-          expr.size match {
-            case Globals.WORD_SIZE => Store(state.tmp, OffsetMode(state.tmp3))
-            case Globals.CHAR_SIZE => StoreByte(state.tmp, OffsetMode(state.tmp3))
-          },
-          Move(state.tmp, state.tmp3),
-          Push(List(state.tmp))
-        )
-        instructions
-      }
-
-      instructions ++= compileExprForPair(expr1)
-      instructions ++= compileExprForPair(expr2)
-
+    def compileExprForPair(expr: Expr): mutable.ListBuffer[Instruction] = {
+      val instructions: mutable.ListBuffer[Instruction] =
+        mutable.ListBuffer.empty
       instructions ++= List(
         Push(List(R0, R1)),
-        Move(R0, ImmVal(PAIR_SIZE)),
+        Move(R0, ImmVal(expr.size)),
         BranchAndLink("malloc"),
         Move(state.tmp3, R0),
-        Pop(List(R0, R1)),
-        Pop(List(state.tmp)),
-        Store(state.tmp, OffsetMode(state.tmp3, shiftAmount = ImmVal(WORD_SIZE))),
-        Pop(List(state.tmp)),
-        Store(state.tmp, OffsetMode(state.tmp3)),
-        Move(resReg, state.tmp3),
+        Pop(List(R0, R1))
       )
+
+      instructions ++= compileExpr(expr, state.tmp)
+
+      instructions ++= List(
+        expr.size match {
+          case Globals.WORD_SIZE => Store(state.tmp, OffsetMode(state.tmp3))
+          case Globals.CHAR_SIZE => StoreByte(state.tmp, OffsetMode(state.tmp3))
+        },
+        Move(state.tmp, state.tmp3),
+        Push(List(state.tmp))
+      )
+      instructions
+    }
+
+    instructions ++= compileExprForPair(expr1)
+    instructions ++= compileExprForPair(expr2)
+
+    instructions ++= List(
+      Push(List(R0, R1)),
+      Move(R0, ImmVal(PAIR_SIZE)),
+      BranchAndLink("malloc"),
+      Move(state.tmp3, R0),
+      Pop(List(R0, R1)),
+      Pop(List(state.tmp)),
+      Store(state.tmp, OffsetMode(state.tmp3, shiftAmount = ImmVal(WORD_SIZE))),
+      Pop(List(state.tmp)),
+      Store(state.tmp, OffsetMode(state.tmp3)),
+      Move(resReg, state.tmp3)
+    )
   }
-
-
 
   def compileFunctionCall(funcCallNode: Call)
   // (implicit
@@ -576,7 +598,7 @@ object CodeGenerator {
       case ident: Ident =>
         instructions ++= compileIdent(ident, resReg)
       case Mult(x, y) => {
-        Utils.intErrOverflowFlag = true 
+        Utils.intErrOverflowFlag = true
         instructions ++= compileExpr(x, operand1Reg)
         instructions += Push(List(operand1Reg))
         instructions ++= compileExpr(y, operand2Reg)
@@ -806,10 +828,9 @@ object CodeGenerator {
       }
 
       case IntegerLiter(x) =>
-        
-        if (x.abs > 255) 
+        if (x.abs > 255)
           instructions += Load(resReg, LoadImmVal(x)) // for overflow
-        else 
+        else
           instructions += Move(resReg, ImmVal(x))
 
       case BoolLiter(x) => {
@@ -841,7 +862,14 @@ object CodeGenerator {
 
             state.identToReg.get(ident) match {
               case Some(reg) => instructions += Move(R3, reg)
-              case None   => instructions += Load(R3, OffsetMode(SP, shiftAmount = ImmVal(StackMachine.getIdentOffset(ident))))
+              case None =>
+                instructions += Load(
+                  R3,
+                  OffsetMode(
+                    SP,
+                    shiftAmount = ImmVal(StackMachine.getIdentOffset(ident))
+                  )
+                )
             }
 
             instructions ++= List(
@@ -975,19 +1003,21 @@ object CodeGenerator {
     }
   }
 
-      
-  def getLValueSize(lValue: LValue)(implicit symbolTable: Map[Ident, Type]): Int ={
+  def getLValueSize(
+      lValue: LValue
+  )(implicit symbolTable: Map[Ident, Type]): Int = {
     lValue match {
       case id: Ident => {
         symbolTable.get(id).get.size
       }
-        
+
       case array: ArrayElem => array.actualSize
-      
-      case pElem: PairElem => pElem match {
-        case Fst(x) => getLValueSize(x)
-        case Snd(y) => getLValueSize(y)
-      }
+
+      case pElem: PairElem =>
+        pElem match {
+          case Fst(x) => getLValueSize(x)
+          case Snd(y) => getLValueSize(y)
+        }
     }
   }
 
