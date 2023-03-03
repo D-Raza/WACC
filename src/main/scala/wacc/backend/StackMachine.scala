@@ -19,7 +19,8 @@ object StackMachine {
 
   def addStackFrame(
       symbolTable: Map[Ident, Type],
-      paramList: List[Param] = List()
+      paramList: List[Param] = List(),
+      isFun: Boolean = false
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
@@ -33,7 +34,7 @@ object StackMachine {
     // if (stackFrameList.length == 1) {
     //   instructions += Move(FP, SP)
     // }
-    if (stackFrameList.length == 1) {
+    if (!isFun && stackFrameList.length == 1) {
       instructions.addAll(
         List(
           Push(List(FP, LR)),
@@ -128,7 +129,22 @@ object StackMachine {
 }
 
 class StackFrame(symbolTable: Map[Ident, Type], paramList: List[Param]) {
-  var declaredVarMap: Map[Ident, Int] = Map.empty
+  var declaredVarMap: Map[Ident, Int] = {
+    var map: Map[Ident, Int] = Map.empty
+    var offset = 0
+
+    for (param <- paramList) {
+      map += (param.ident -> offset)
+      offset += param.ty.size
+    }
+
+    for ((ident, ty) <- symbolTable) {
+      map += (ident -> offset)
+      offset += ty.size
+    }
+
+    map
+  }
 
   var currVarOffset = 0
   var currArgOffset = 0

@@ -11,8 +11,6 @@ object CodeGenerator {
   )(implicit state: CodeGenState): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
-    // FunctionDeclarationMap.compiledFunctions = (for (f <- programNode.funcs) yield f.ident.name -> f).toMap
-
     programNode.funcs.foreach(func => {
       implicit val printTable: Map[(Int, Int), Type] = func.printTable
       implicit val symbolTable: Map[Ident, Type] = func.symbolTable
@@ -49,7 +47,6 @@ object CodeGenerator {
     instructions += Pop(List(PC))
 
     Utils.addUtils()(instructions)
-    // instructions ++= FunctionDeclarationMap.getAllCompiledFuncDefs.flatten
     mainLabels.addLabelInstructions(instructions)
 
     instructions
@@ -62,28 +59,30 @@ object CodeGenerator {
       functionTable: Map[Ident, (Type, List[Type])],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
-    /*
-    val funcSymbolTable = funcNode.symbolTable
-    val funcPrintTable = funcNode.printTable
-    val funcName: String = "wacc_" + funcNode.ident.name
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
+    val funcNameLabel = "wacc_" + funcNode.ident.name 
 
-    FunctionDeclarationMap.setFuncAsCompiled(funcNode.ident.name)
+    val paramsAndRegs = funcNode.paramList zip List(R0, R1, R2, R3, R4) 
 
-    funcNode.stats.foreach(f)
+    paramsAndRegs.foreach{case ((Param(_, ident), reg)) => state.identToReg += (ident -> reg)}
 
-    val fNodeRef = FunctionDeclarationMap.functionReferenceMap(funcNode.ident.name)
-    val fBody = compileStat(fNodeRef.s)
+    instructions ++= List( 
+      Label(funcNameLabel),
+      Push(List(FP, LR)),
+      Move(FP, SP)
+    )
 
+    StackMachine.addStackFrame(funcNode.symbolTable, funcNode.paramList, true)
+    instructions ++= compileStats(funcNode.stats)(state, printTable, symbolTable, functionTable, labels)
+    StackMachine.removeStackFrame(true)
+    
+    instructions ++= List(
+      Move(SP, FP), 
+      Pop(List(FP, PC)),
+      Directive("ltorg")
+    )
 
-
-
-
-    instructions += Label(funcName)
-    // instructions ++= compileStats(funcNode.paramList)
-    instructions += Label(".ltorg")
-     */
-    mutable.ListBuffer.empty
+    instructions    
   }
 
   def compileStats(stats: List[Stat])(implicit
@@ -439,7 +438,7 @@ object CodeGenerator {
       case NewPair(expr1, expr2) =>
         instructions ++= compileNewPair(expr1, expr2, resReg)
       case call: Call =>
-        instructions ++= compileFunctionCall(call)
+        instructions ++= compileFunctionCall(call, resReg)
       case expr: Expr => instructions ++= compileExpr(expr, resReg)
       case pair: PairElem => {
         // instructions += Push(List(R8))
@@ -627,7 +626,7 @@ object CodeGenerator {
     )
   }
 
-  def compileFunctionCall(funcCallNode: Call)(implicit
+  def compileFunctionCall(funcCallNode: Call, resReg: Register)(implicit
       state: CodeGenState,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
@@ -636,51 +635,38 @@ object CodeGenerator {
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
     val argsSize =
-      funcCallNode.args.foldLeft(0)((sum: Int, expr: Expr) => sum + expr.size)
+    funcCallNode.args.foldLeft(0)((sum: Int, expr: Expr) => sum + expr.size)
 
     instructions += SubInstr(SP, SP, ImmVal(argsSize))
-    var offset = 0
-    val argsPushed: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
+    // sub stack pointer by size of args (handled by stack machine)
+    // reverse the args (order that theyre pushed in stack)
+    // push the reversed args onto stack 
+    // add stack pointer back to original pos (handled by stack machine)
+    // move resreg r0 (handled by assign)
 
+    instructions += Comment("Pushing arguments onto stack")
+    
+    instructions ++= StackMachine.addStackFrame(symbolTable)
+    
+    val regs = mutable.Stack(R0, R1, R2, R3, R4)
     for (argument <- funcCallNode.args.reverse) {
-      // val argReg = state.getReg
-      argsPushed ++= compileExpr(argument, R0)
-      argument.size match {
-        case Globals.BYTE_SIZE => {
-          argsPushed += StoreByte(
-            R0,
-            OffsetMode(SP, shiftAmount = ImmVal(offset))
-          )
-          offset += Globals.BYTE_SIZE
-        }
-
-        case _ => {
-          argsPushed += Store(R0, OffsetMode(SP, shiftAmount = ImmVal(offset)))
-          offset += Globals.WORD_SIZE
-        }
+      // instructions ++= compileExpr(argument, state.tmp)
+      // instructions += Push(List(state.tmp))
+      
+      if (regs.isEmpty) {
+        instructions += Comment("TODO: handle more than 5 args")
+      } else {
+        // argsPushed ++= compileExpr(argument, state.tmp)
+        instructions ++= compileExpr(argument, regs.pop())
       }
     }
 
-    // val functionName = funcCallNode.x.name
-    // if (!FunctionDeclarationMap.functionDefined(functionName)) {
-    //   FunctionDeclarationMap.setFuncAsCompiled(functionName)
-
-    //   val funcBodyDef = FunctionDeclarationMap.includeFuncBodyDef(functionName)
-
-    //   // val paramsList: List[Param] = funcCallNode.args.map((expr: ))
-
-    //   // val funcStackFrame = StackMachine.addStackFrame(symbolTable, functionTable.get(funcCallNode.x).)
-
-    //   val removeFrame = StackMachine.removeStackFrame()
-
-    //   // FunctionDeclarationMap.includeFuncBodyDef(functionName, funcStackFrame ++ funcBodyDef ++ removeFrame)
-    // }
-
-    // val functionName = funcCallNode.x.name
-
-    instructions ++= argsPushed
+    // instructions ++= argsPushed
     instructions += BranchAndLink("wacc_" + funcCallNode.x.name)
+    instructions += Move(resReg, R0)
+
     instructions += AddInstr(SP, SP, ImmVal(argsSize))
+    instructions ++= StackMachine.removeStackFrame(true)
   }
 
   def compileExpr(expr: Expr, resReg: Register)(implicit
