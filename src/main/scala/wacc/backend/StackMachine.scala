@@ -26,13 +26,23 @@ object StackMachine {
     val stackFrameToAdd = new StackFrame(symbolTable, paramList)
     stackFrameList += stackFrameToAdd
 
-    instructions.addAll(
-      List(
-        Push(List(FP, LR)),
-        Push(List(R4, R5, R6, R7, R8, R10, IP)),
-        Move(FP, SP)
+    // if (stackFrameList.length == 1) {
+    //   instructions += Push(List(FP, LR))
+    // }
+    // instructions += Push(List(R4, R5, R6, R7, R8, R10, IP))
+    // if (stackFrameList.length == 1) {
+    //   instructions += Move(FP, SP)
+    // }
+    if (stackFrameList.length == 1) {
+      instructions.addAll(
+        List(
+          Push(List(FP, LR)),
+          Push(List(R4, R5, R6, R7, R8, R10, IP)),
+          Move(FP, SP)
+        )
       )
-    )
+    }
+
     instructions.addAll(assignStackSpace(stackFrameToAdd.currVarOffset))
 
     instructions
@@ -48,10 +58,17 @@ object StackMachine {
     instructions.addAll(
       if (!fun) unassignStackSpace(stackFrameToRemove.currVarOffset) else List()
     )
-    instructions ++= List(
-      Pop(List(R4, R5, R6, R7, R8, R10, IP)),
-      Pop(List(FP))
-    )
+    if (stackFrameList.length == 0) {
+      instructions ++= List(
+        Pop(List(R4, R5, R6, R7, R8, R10, IP)),
+        Pop(List(FP))
+      )
+    }
+
+    // if (stackFrameList.length != 0) {
+    //   instructions ++= List(Pop(List(FP, LR)))
+    // }
+
     instructions
   }
 
@@ -59,12 +76,17 @@ object StackMachine {
       spaceRequired: Int
   ): mutable.ListBuffer[Instruction] = {
     if (spaceRequired == 0)
-      mutable.ListBuffer(PendingStackOffset(SubInstr(SP, SP, ImmVal(0))))
+      mutable.ListBuffer(
+        PendingStackOffset(SubInstr(SP, SP, ImmVal(0)), stackFrameList.last)
+      )
     else {
       val instructions: mutable.ListBuffer[Instruction] =
         mutable.ListBuffer.empty
 
-      instructions += SubInstr(SP, SP, ImmVal(spaceRequired))
+      instructions += PendingStackOffset(
+        SubInstr(SP, SP, ImmVal(spaceRequired)),
+        stackFrameList.last
+      )
 
       instructions
     }
@@ -97,7 +119,7 @@ object StackMachine {
             res = x
             found = true
           }
-          case None =>
+          case None => res = -999
         }
       }
     }
