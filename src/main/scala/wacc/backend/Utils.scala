@@ -1,7 +1,7 @@
 package wacc.backend
 import wacc.backend._
 import wacc.backend.Globals.{WORD_SIZE, CHAR_SIZE}
-import wacc.backend.Condition.{NE, EQ}
+import wacc.backend.Condition.NE
 
 import scala.collection.mutable
 
@@ -63,6 +63,7 @@ object Utils {
     }
     if (arrayFlag) {
       arrStore()
+      arrStoreB()
       arrLoad()
       boundsCheck()
     }
@@ -322,7 +323,7 @@ object Utils {
   ): Unit = {
     instructions.addAll(
       List(
-        Directive("text"),
+        Directive("data"),
         Label("_freepair"),
         Push(List(LR)),
         Move(R8, R0),
@@ -369,7 +370,7 @@ object Utils {
     instructions.addAll(
       List(
         /* @ Special calling convention: array ptr passed in R3, index in R10,
-            value to store in R7, LR (R14) is used as general register */
+            value to store in R8, LR (R14) is used as general register */
         Label("_arrStore"),
         Push(List(LR)),
         Cmp(R10, ImmVal(0)),
@@ -385,6 +386,30 @@ object Utils {
       )
     )
   }
+
+  private def arrStoreB()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+      ): Unit = {
+
+        instructions.addAll(
+          List(
+            Label("_arrStoreB"),
+            Push(List(LR)),
+            Cmp(R10, ImmVal(0)),
+            Move(R1, R10, Condition.LT),
+            BranchAndLink("_boundsCheck", Condition.LT),
+            Load(LR, OffsetMode(baseReg = R3, shiftAmount = ImmVal(-4))),
+            Cmp(R10, LR),
+            Move(R1, R10, Condition.GE),
+            BranchAndLink("_boundsCheck", Condition.GE),
+            // strb r8, [r3, r10]
+            StoreByte(R8, PreIndexedMode(baseReg = R3, auxReg = Some(R10))),
+            Pop(List(PC))
+          )
+        )
+
+      }
+
   private def arrLoad()(implicit
       instructions: mutable.ListBuffer[Instruction]
   ): Unit = {

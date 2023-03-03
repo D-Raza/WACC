@@ -56,7 +56,7 @@ case class Rsb(
     operand2: Operand2,
     cond: Condition = AL
 ) extends Instruction {
-  override val opcode: String = "rsb"
+  override val opcode: String = "rsbs"
   override def opsToString: String = s"$destReg, $operand1, $operand2"
 }
 

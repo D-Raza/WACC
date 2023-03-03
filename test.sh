@@ -99,7 +99,7 @@ test_task() {
                     emulator_output=${emulator_output%/}
                     if [ $emulator_exit_code -eq $expected_runtime_exit_code ]; then
                         if [ ! -z "$expected_output" ]; then
-                            output_diff=$(diff -b <(echo "$expected_output" | grep -vE '#addrs#') <(echo "$emulator_output" | grep -vE '0x'))
+                            output_diff=$(diff -b <(echo "$expected_output" | grep -vE '#addrs#|#runtime_error#') <(echo "$emulator_output" | grep -vE '0x|fatal'))
                             # if [ "${emulator_output}" == "${expected_output}" ]; then
                             if [ -z "$output_diff" ]; then
                                 test_result="\e[1;32m[PASS]\e[0m \e[32m$file\e[0m"

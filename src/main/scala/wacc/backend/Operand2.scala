@@ -23,7 +23,7 @@ sealed trait AddressingMode extends Operand2 {
   override def toString: String = {
     s"[${baseReg.toString()}${auxReg.map(r => s", ${r.toString()}").getOrElse("")}${shiftType
         .map(s => s", ${s.toString}")
-        .getOrElse("")}, ${shiftAmount.toString()}]"
+        .getOrElse("")}${if (shiftAmount.value != 0) s", ${shiftAmount.toString()}" else ""}]"
   }
 }
 

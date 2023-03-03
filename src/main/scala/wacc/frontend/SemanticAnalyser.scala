@@ -225,13 +225,13 @@ object SemanticAnalyser {
         val (exprType, exprTypeErrors, exprPrintTable) = evalTypeOfExpr(expr)
         errors ++= exprTypeErrors
         printTable ++= exprPrintTable
-        printTable.addOne(expr.pos, exprType)
+        (if (!printTable.contains(expr.pos)) printTable.addOne(expr.pos, exprType))
 
       case Println(expr) =>
         val (exprType, exprTypeErrors, exprPrintTable) = evalTypeOfExpr(expr)
         errors ++= exprTypeErrors
         printTable ++= exprPrintTable
-        printTable.addOne(expr.pos, exprType)
+        (if (!printTable.contains(expr.pos)) printTable.addOne(expr.pos, exprType))
 
       case ifNode @ If(cond, thenStat, elseStat) =>
         val (condType, condTypeErrors, condPrintTable) = evalTypeOfExpr(cond)
@@ -560,7 +560,7 @@ object SemanticAnalyser {
             printTable.toMap
           )
         }
-      case ArrayElem(ident, xs) =>
+      case array @ ArrayElem(ident, xs) =>
         def getArrayTypeRank(ty: Type): Int = {
           ty match {
             case ArrayType(innerTy) => 1 + getArrayTypeRank(innerTy)
@@ -572,27 +572,32 @@ object SemanticAnalyser {
 
         symbolTable get ident match {
           case Some(t @ ArrayType(innerType)) =>
-            println(
-              "Entering ArrayElem case with ident: " + ident + " and t: " + t
-            )
             val (argTypes, argErrors, pt) =
               xs.map(evalTypeOfExpr(_)).unzip3
             errors ++= argErrors.flatten
             printTable ++= pt.foldLeft(Map.empty: Map[(Int, Int), Type]) {
               (acc, m) => (acc ++ m.toMap)
             }
-            println("SEMANTIC PRINT TABLE: " + printTable)
-            if (xs.length > getArrayTypeRank(t))
-              (
-                ErrorType()(ident.pos),
-                (errors += ArrayDimensionMismatchError.genError(
-                  xs.length,
-                  getArrayTypeRank(t),
-                  ident.pos
-                )).toList,
-                printTable.toMap
-              )
 
+            var currType: Type = t
+            var currRank = xs.length           
+            while (currRank > 0) {
+              currType match {
+                case ArrayType(innerType) =>
+                  currType = innerType
+                  currRank -= 1
+                case _ =>
+                  errors += ArrayDimensionMismatchError.genError(
+                    xs.length,
+                    getArrayTypeRank(t),
+                    ident.pos
+                    )
+                  currRank = 0
+              }
+            }
+            printTable += (array.pos -> currType)
+            array.actualSize = currType.size
+                  
             argTypes.zipWithIndex.foreach { case (argType, i) =>
               if (!(argType equiv IntType()(NULLPOS)))
                 (

@@ -128,7 +128,7 @@ object AST {
   // RValues
   sealed trait RValue {
     val pos: (Int, Int)
-  }
+  } 
 
   sealed trait Expr extends RValue {
     def size: Int = this match {
@@ -242,7 +242,9 @@ object AST {
 
   case class ArrayElem(ident: Ident, xs: List[Expr])(val pos: (Int, Int))
       extends LValue
-      with Expr
+      with Expr {
+        var actualSize: Int = 4
+      }
 
   case class Fst(p: LValue)(val pos: (Int, Int)) extends PairElem
 
@@ -308,6 +310,7 @@ object AST {
       ))
     ) "pair"
     else s"pair($fstType, $sndType)"
+    override def size: Int = 4
   }
 
   case class InnerPairType()(val pos: (Int, Int)) extends PairElemType {
