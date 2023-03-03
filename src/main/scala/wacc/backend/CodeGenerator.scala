@@ -40,6 +40,7 @@ object CodeGenerator {
     println(StackMachine.stackFrameList.last.declaredVarMap)
 
     instructions ++= StackMachine.removeStackFrame()
+    
     instructions += Pop(List(PC))
 
     Utils.addUtils()(instructions)
@@ -311,6 +312,9 @@ object CodeGenerator {
         val uniqueWhileName = "while_" + state.getNewLabelId;
         val condLabel = uniqueWhileName + "_cond"
         val bodyLabel = uniqueWhileName + "_body"
+        val oldIdentToReg: mutable.Map[Ident, Register] = mutable.Map.empty
+        oldIdentToReg ++= state.identToReg
+        
         instructions += Branch(condLabel)
 
         instructions += Label(bodyLabel)
@@ -331,16 +335,22 @@ object CodeGenerator {
 
         instructions.addAll(
           List(
-            Cmp(condReg, ImmVal(1)),
+            Cmp(condReg, ImmVal(1)), 
             Branch(bodyLabel, Condition.EQ)
           )
         )
+
+        oldIdentToReg.foreach{case (id, reg) => state.identToReg += (id -> reg)}
       }
 
       case scopeNode @ Scope(stats) => {
-        StackMachine.addStackFrame(scopeNode.symbolTable)
-        stats.foreach(stat => instructions ++= compileStat(stat))
-        // TODO - implement compileBlock or similar
+
+        val oldIdentToReg: mutable.Map[Ident, Register] = mutable.Map.empty
+        oldIdentToReg ++= state.identToReg
+        instructions ++= StackMachine.addStackFrame(scopeNode.symbolTable)
+        instructions ++= compileStats(stats)
+        instructions ++= StackMachine.removeStackFrame()
+        oldIdentToReg.foreach{case (id, reg) => state.identToReg += (id -> reg)}
       }
     }
     instructions
@@ -918,6 +928,10 @@ object CodeGenerator {
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
+    val oldIdentToReg: mutable.Map[Ident, Register] = mutable.Map.empty
+
+    oldIdentToReg ++= state.identToReg    
+
     val condReg = state.tmp
 
     // Compile condition
@@ -965,6 +979,8 @@ object CodeGenerator {
     // instructions ++= StackMachine.removeStackFrame()
 
     instructions += Label(endLabel)
+
+    oldIdentToReg.foreach{case (id, reg) => state.identToReg += (id -> reg)}
 
     instructions
 

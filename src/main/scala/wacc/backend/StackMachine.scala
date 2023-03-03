@@ -26,17 +26,28 @@ object StackMachine {
     val stackFrameToAdd = new StackFrame(symbolTable, paramList)
     stackFrameList += stackFrameToAdd
 
-    instructions.addAll(
-      List(
-        Push(List(FP, LR)),
-        Push(List(R4, R5, R6, R7, R8, R10, IP)),
-        Move(FP, SP)
-      )
-    )
-    instructions.addAll(assignStackSpace(stackFrameToAdd.currVarOffset))
+    // if (stackFrameList.length == 1) {
+    //   instructions += Push(List(FP, LR))
+    // } 
+    // instructions += Push(List(R4, R5, R6, R7, R8, R10, IP))
+    // if (stackFrameList.length == 1) {
+    //   instructions += Move(FP, SP) 
+    // }
+    if(stackFrameList.length == 1) {
+      instructions.addAll(
+            List(
+              Push(List(FP, LR)),
+              Push(List(R4, R5, R6, R7, R8, R10, IP)),
+              Move(FP, SP)
+            )
+          )   
+    }
+ 
+      instructions.addAll(assignStackSpace(stackFrameToAdd.currVarOffset))
 
-    instructions
-  }
+      instructions
+    } 
+
 
   def removeStackFrame(
       fun: Boolean = false
@@ -48,10 +59,18 @@ object StackMachine {
     instructions.addAll(
       if (!fun) unassignStackSpace(stackFrameToRemove.currVarOffset) else List()
     )
-    instructions ++= List(
-      Pop(List(R4, R5, R6, R7, R8, R10, IP)),
-      Pop(List(FP))
-    )
+    if(stackFrameList.length == 0) {
+      instructions ++= List(
+        Pop(List(R4, R5, R6, R7, R8, R10, IP)),
+        Pop(List(FP))
+      )
+    }
+
+
+    // if (stackFrameList.length != 0) {
+    //   instructions ++= List(Pop(List(FP, LR)))
+    // }
+      
     instructions
   }
 
