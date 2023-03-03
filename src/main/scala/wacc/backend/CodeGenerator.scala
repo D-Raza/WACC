@@ -37,12 +37,16 @@ object CodeGenerator {
 
     instructions += Pop(List(PC))
 
-    Utils.addUtils()(instructions)
+    
+    val funcInstructions = mutable.ListBuffer.empty[Instruction]
     
     programNode.funcs.foreach(func => {
-      instructions ++= compileFunc(func)(state, func.printTable, func.symbolTable, programNode.functionTable, new Labels(func.ident.name))
+      funcInstructions ++= compileFunc(func)(state, func.printTable, func.symbolTable, programNode.functionTable, new Labels(func.ident.name))
     })
     
+    Utils.addUtils()(instructions)
+    instructions ++= funcInstructions
+
     mainLabels.addLabelInstructions(instructions)
     instructions
   }
