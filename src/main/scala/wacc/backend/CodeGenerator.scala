@@ -5,7 +5,6 @@ import wacc.backend.Globals.{WORD_SIZE, PAIR_SIZE}
 import wacc.backend.Utils
 import scala.collection.mutable
 
-
 object CodeGenerator {
   def compileProgram(
       programNode: Program
@@ -18,13 +17,15 @@ object CodeGenerator {
       implicit val printTable: Map[(Int, Int), Type] = func.printTable
       implicit val symbolTable: Map[Ident, Type] = func.symbolTable
       implicit val funcLabels = new Labels(func.ident.name)
-      implicit val functionTable: Map[Ident, (Type, List[Type])] = programNode.functionTable
+      implicit val functionTable: Map[Ident, (Type, List[Type])] =
+        programNode.functionTable
       instructions ++= compileFunc(func)
     })
 
     implicit val printTable: Map[(Int, Int), Type] = programNode.printTable
     implicit val symbolTable: Map[Ident, Type] = programNode.symbolTable
-    implicit val functionTable: Map[Ident, (Type, List[Type])] = programNode.functionTable
+    implicit val functionTable: Map[Ident, (Type, List[Type])] =
+      programNode.functionTable
     implicit val mainLabels = new Labels("main")
 
     instructions += Comment("Scope: symbolTable = " + programNode.symbolTable)
@@ -44,11 +45,11 @@ object CodeGenerator {
     instructions += Move(R0, ImmVal(0))
 
     instructions ++= StackMachine.removeStackFrame()
-    
+
     instructions += Pop(List(PC))
 
     Utils.addUtils()(instructions)
-    //instructions ++= FunctionDeclarationMap.getAllCompiledFuncDefs.flatten
+    // instructions ++= FunctionDeclarationMap.getAllCompiledFuncDefs.flatten
     mainLabels.addLabelInstructions(instructions)
 
     instructions
@@ -74,14 +75,14 @@ object CodeGenerator {
     val fNodeRef = FunctionDeclarationMap.functionReferenceMap(funcNode.ident.name)
     val fBody = compileStat(fNodeRef.s)
 
-    
+
 
 
 
     instructions += Label(funcName)
     // instructions ++= compileStats(funcNode.paramList)
     instructions += Label(".ltorg")
-    */
+     */
     mutable.ListBuffer.empty
   }
 
@@ -128,11 +129,14 @@ object CodeGenerator {
             val offset = StackMachine.addDeclaration(ident, ty.size)
             instructions ++= compileRValue(rValue, state.tmp)
             instructions += PendingStackOffset(
-              storeRes(offset, ty.size, state.tmp), StackMachine.stackFrameList.last
+              storeRes(offset, ty.size, state.tmp),
+              StackMachine.stackFrameList.last
             )
           }
         }
-        instructions += Comment("identToRegs: " + state.identToReg + "declaredVarMap: " + StackMachine.stackFrameList.last.declaredVarMap)
+        instructions += Comment(
+          "identToRegs: " + state.identToReg + "declaredVarMap: " + StackMachine.stackFrameList.last.declaredVarMap
+        )
       }
 
       case Assign(lValue, rValue) => {
@@ -162,7 +166,8 @@ object CodeGenerator {
               case None => {
                 val offset = StackMachine.getIdentOffset(ident)
                 instructions += PendingStackOffset(
-                  storeRes(offset, ident.size, state.tmp), StackMachine.stackFrameList.last
+                  storeRes(offset, ident.size, state.tmp),
+                  StackMachine.stackFrameList.last
                 )
               }
             }
@@ -212,7 +217,8 @@ object CodeGenerator {
               case None => {
                 val offset = StackMachine.getIdentOffset(ident)
                 instructions += PendingStackOffset(
-                  storeRes(offset, ident.size, R0), StackMachine.stackFrameList.last
+                  storeRes(offset, ident.size, R0),
+                  StackMachine.stackFrameList.last
                 )
               }
             }
@@ -328,7 +334,7 @@ object CodeGenerator {
         val bodyLabel = uniqueWhileName + "_body"
         val oldIdentToReg: mutable.Map[Ident, Register] = mutable.Map.empty
         oldIdentToReg ++= state.identToReg
-        
+
         instructions += Branch(condLabel)
 
         instructions += Label(bodyLabel)
@@ -350,12 +356,14 @@ object CodeGenerator {
 
         instructions.addAll(
           List(
-            Cmp(condReg, ImmVal(1)), 
+            Cmp(condReg, ImmVal(1)),
             Branch(bodyLabel, Condition.EQ)
           )
         )
 
-        oldIdentToReg.foreach{case (id, reg) => state.identToReg += (id -> reg)}
+        oldIdentToReg.foreach { case (id, reg) =>
+          state.identToReg += (id -> reg)
+        }
       }
 
       case scopeNode @ Scope(stats) => {
@@ -363,11 +371,21 @@ object CodeGenerator {
         val oldIdentToReg: mutable.Map[Ident, Register] = mutable.Map.empty
 
         oldIdentToReg ++= state.identToReg
-        instructions += Comment("Scope: symbolTable = " + scopeNode.symbolTable + " sf " + StackMachine.stackFrameList.size)
+        instructions += Comment(
+          "Scope: symbolTable = " + scopeNode.symbolTable + " sf " + StackMachine.stackFrameList.size
+        )
         instructions ++= StackMachine.addStackFrame(scopeNode.symbolTable)
-        instructions ++= compileStats(stats)(state, printTable, scopeNode.symbolTable, labels)
+        instructions ++= compileStats(stats)(
+          state,
+          printTable,
+          scopeNode.symbolTable,
+          functionTable,
+          labels
+        )
         instructions ++= StackMachine.removeStackFrame()
-        oldIdentToReg.foreach{case (id, reg) => state.identToReg += (id -> reg)}
+        oldIdentToReg.foreach { case (id, reg) =>
+          state.identToReg += (id -> reg)
+        }
       }
     }
     instructions
@@ -609,66 +627,61 @@ object CodeGenerator {
     )
   }
 
-  def compileFunctionCall(funcCallNode: Call)
-   (implicit
-       state: CodeGenState,
-       printTable: Map[(Int, Int), Type],
-       symbolTable: Map[Ident, Type],
-       functionTable: Map[Ident, (Type, List[Type])],
-       labels: Labels) 
-      : mutable.ListBuffer[Instruction] = {
-        val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
-        val argsSize =  funcCallNode.args.foldLeft(0)((sum: Int, expr: Expr) => sum + expr.size)
-      
+  def compileFunctionCall(funcCallNode: Call)(implicit
+      state: CodeGenState,
+      printTable: Map[(Int, Int), Type],
+      symbolTable: Map[Ident, Type],
+      functionTable: Map[Ident, (Type, List[Type])],
+      labels: Labels
+  ): mutable.ListBuffer[Instruction] = {
+    val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
+    val argsSize =
+      funcCallNode.args.foldLeft(0)((sum: Int, expr: Expr) => sum + expr.size)
 
-        instructions += SubInstr(SP, SP, ImmVal(argsSize))
-        var offset = 0
-        val argsPushed: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
+    instructions += SubInstr(SP, SP, ImmVal(argsSize))
+    var offset = 0
+    val argsPushed: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
-
-        for (argument <- funcCallNode.args.reverse) {
-          // val argReg = state.getReg 
-          argsPushed ++= compileExpr(argument, R0)
-          argument.size match {
-            case Globals.BYTE_SIZE => {
-              argsPushed += StoreByte(R0, OffsetMode(SP, shiftAmount = ImmVal(offset)))
-              offset += Globals.BYTE_SIZE
-            }
-            
-            case _ => { 
-              argsPushed += Store(R0, OffsetMode(SP, shiftAmount = ImmVal(offset)))
-              offset += Globals.WORD_SIZE
-            }
-          }
-        }
-        
-        val functionName = funcCallNode.x.name
-        if (!FunctioDeclarationMap.functionDefined(functionName)) {
-          FunctionDeclarationMap.setFuncAsCompiled(functionName)
-
-          
-
-          val funcBodyDef = FunctionDeclarationMap.includeFuncBodyDef(functionName)
-
-          // val paramsList: List[Param] = funcCallNode.args.map((expr: ))
-
-         // val funcStackFrame = StackMachine.addStackFrame(symbolTable, functionTable.get(funcCallNode.x).)
-
-          val removeFrame = StackMachine.removeStackFrame()
-          
-          // FunctionDeclarationMap.includeFuncBodyDef(functionName, funcStackFrame ++ funcBodyDef ++ removeFrame) 
+    for (argument <- funcCallNode.args.reverse) {
+      // val argReg = state.getReg
+      argsPushed ++= compileExpr(argument, R0)
+      argument.size match {
+        case Globals.BYTE_SIZE => {
+          argsPushed += StoreByte(
+            R0,
+            OffsetMode(SP, shiftAmount = ImmVal(offset))
+          )
+          offset += Globals.BYTE_SIZE
         }
 
-        // val functionName = funcCallNode.x.name 
+        case _ => {
+          argsPushed += Store(R0, OffsetMode(SP, shiftAmount = ImmVal(offset)))
+          offset += Globals.WORD_SIZE
+        }
+      }
+    }
 
-        instructions ++= argsPushed
-        instructions += BranchAndLink("wacc_" + funcCallNode.x.name)
-        instructions += AddInstr(SP, SP, ImmVal(argsSize))
-    } 
-      
+    // val functionName = funcCallNode.x.name
+    // if (!FunctionDeclarationMap.functionDefined(functionName)) {
+    //   FunctionDeclarationMap.setFuncAsCompiled(functionName)
 
-      
-      
+    //   val funcBodyDef = FunctionDeclarationMap.includeFuncBodyDef(functionName)
+
+    //   // val paramsList: List[Param] = funcCallNode.args.map((expr: ))
+
+    //   // val funcStackFrame = StackMachine.addStackFrame(symbolTable, functionTable.get(funcCallNode.x).)
+
+    //   val removeFrame = StackMachine.removeStackFrame()
+
+    //   // FunctionDeclarationMap.includeFuncBodyDef(functionName, funcStackFrame ++ funcBodyDef ++ removeFrame)
+    // }
+
+    // val functionName = funcCallNode.x.name
+
+    instructions ++= argsPushed
+    instructions += BranchAndLink("wacc_" + funcCallNode.x.name)
+    instructions += AddInstr(SP, SP, ImmVal(argsSize))
+  }
 
   def compileExpr(expr: Expr, resReg: Register)(implicit
       state: CodeGenState,
@@ -941,25 +954,25 @@ object CodeGenerator {
       case ArrayElem(ident: Ident, xs: List[Expr]) => {
         Utils.arrayFlag = true
 
-
         xs match {
           case head :: tail => {
             instructions ++= compileExpr(head, R10)
 
             if (resReg != R3)
               instructions += Push(List(R3))
-            
+
             state.identToReg.get(ident) match {
               case Some(reg) => if (reg != R3) instructions += Move(R3, reg)
               case None =>
-                instructions += PendingStackOffset(Load(
-                  R3,
-                  OffsetMode(
-                    FP,
-                    shiftAmount = ImmVal(StackMachine.getIdentOffset(ident))
-                  )
-                ),
-                StackMachine.stackFrameList.last
+                instructions += PendingStackOffset(
+                  Load(
+                    R3,
+                    OffsetMode(
+                      FP,
+                      shiftAmount = ImmVal(StackMachine.getIdentOffset(ident))
+                    )
+                  ),
+                  StackMachine.stackFrameList.last
                 )
             }
 
@@ -1017,7 +1030,7 @@ object CodeGenerator {
 
     val oldIdentToReg: mutable.Map[Ident, Register] = mutable.Map.empty
 
-    oldIdentToReg ++= state.identToReg    
+    oldIdentToReg ++= state.identToReg
 
     val condReg = state.tmp
 
@@ -1069,12 +1082,12 @@ object CodeGenerator {
 
     instructions += Label(endLabel)
 
-    oldIdentToReg.foreach{case (id, reg) => state.identToReg += (id -> reg)}
+    oldIdentToReg.foreach { case (id, reg) => state.identToReg += (id -> reg) }
 
     instructions
 
   }
-  
+
   def compileIdent(ident: Ident, resReg: Register)(implicit
       state: CodeGenState
       // printTable: Map[(Int, Int), Type],

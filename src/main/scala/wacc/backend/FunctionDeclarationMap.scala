@@ -10,11 +10,9 @@
 
 //     private val funcMap = mutable.HashMap.empty[String, ListBuffer[Instruction]]
 //     private val compiledFunctions = mutable.HashSet.empty[String]
-    
-  
-  
+
 //     def setFuncAsCompiled(name: String): Unit = compiledFunctions += name
-//     def includeFuncBodyDef(name: String, body: ListBuffer[Instruction]): Unit = funcMap += name -> body 
+//     def includeFuncBodyDef(name: String, body: ListBuffer[Instruction]): Unit = funcMap += name -> body
 //     def isDefinedFunc(name: String): Boolean = compiledFunctions.contains(name)
 
 //     def getAllCompiledFuncDefs: List[ListBuffer[Instruction]] = {
@@ -26,5 +24,5 @@
 //             +: Directive(".ltorg")
 //         }).toList
 //     }
-    
+
 // }

@@ -28,26 +28,25 @@ object StackMachine {
 
     // if (stackFrameList.length == 1) {
     //   instructions += Push(List(FP, LR))
-    // } 
+    // }
     // instructions += Push(List(R4, R5, R6, R7, R8, R10, IP))
     // if (stackFrameList.length == 1) {
-    //   instructions += Move(FP, SP) 
+    //   instructions += Move(FP, SP)
     // }
-    if(stackFrameList.length == 1) {
+    if (stackFrameList.length == 1) {
       instructions.addAll(
-            List(
-              Push(List(FP, LR)),
-              Push(List(R4, R5, R6, R7, R8, R10, IP)),
-              Move(FP, SP)
-            )
-          )   
+        List(
+          Push(List(FP, LR)),
+          Push(List(R4, R5, R6, R7, R8, R10, IP)),
+          Move(FP, SP)
+        )
+      )
     }
- 
-      instructions.addAll(assignStackSpace(stackFrameToAdd.currVarOffset))
 
-      instructions
-    } 
+    instructions.addAll(assignStackSpace(stackFrameToAdd.currVarOffset))
 
+    instructions
+  }
 
   def removeStackFrame(
       fun: Boolean = false
@@ -59,7 +58,7 @@ object StackMachine {
     instructions.addAll(
       if (!fun) unassignStackSpace(stackFrameToRemove.currVarOffset) else List()
     )
-    if(stackFrameList.length == 0) {
+    if (stackFrameList.length == 0) {
       instructions ++= List(
         Pop(List(R4, R5, R6, R7, R8, R10, IP)),
         Pop(List(FP))
@@ -69,7 +68,7 @@ object StackMachine {
     // if (stackFrameList.length != 0) {
     //   instructions ++= List(Pop(List(FP, LR)))
     // }
-      
+
     instructions
   }
 
@@ -77,12 +76,17 @@ object StackMachine {
       spaceRequired: Int
   ): mutable.ListBuffer[Instruction] = {
     if (spaceRequired == 0)
-      mutable.ListBuffer(PendingStackOffset(SubInstr(SP, SP, ImmVal(0)), stackFrameList.last))
+      mutable.ListBuffer(
+        PendingStackOffset(SubInstr(SP, SP, ImmVal(0)), stackFrameList.last)
+      )
     else {
       val instructions: mutable.ListBuffer[Instruction] =
         mutable.ListBuffer.empty
 
-      instructions += PendingStackOffset(SubInstr(SP, SP, ImmVal(spaceRequired)), stackFrameList.last)
+      instructions += PendingStackOffset(
+        SubInstr(SP, SP, ImmVal(spaceRequired)),
+        stackFrameList.last
+      )
 
       instructions
     }
