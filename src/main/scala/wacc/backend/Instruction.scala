@@ -20,7 +20,7 @@ sealed trait Instruction {
   }
 }
 
-case class PendingStackOffset(instruction: Instruction) extends Instruction {
+case class PendingStackOffset(instruction: Instruction, stackFrame: StackFrame) extends Instruction {
   override def opsToString: String =
     instruction.opsToString + " @ PENDING STACK OFFSET"
   override val opcode: String = instruction.opcode

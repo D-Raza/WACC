@@ -1,4 +1,4 @@
-milestone := "wacc_examples/valid/scope"
+milestone := "wacc_examples/valid"
 all: build
 
 lint:

@@ -66,7 +66,6 @@ object StackMachine {
       )
     }
 
-
     // if (stackFrameList.length != 0) {
     //   instructions ++= List(Pop(List(FP, LR)))
     // }
@@ -78,12 +77,12 @@ object StackMachine {
       spaceRequired: Int
   ): mutable.ListBuffer[Instruction] = {
     if (spaceRequired == 0)
-      mutable.ListBuffer(PendingStackOffset(SubInstr(SP, SP, ImmVal(0))))
+      mutable.ListBuffer(PendingStackOffset(SubInstr(SP, SP, ImmVal(0)), stackFrameList.last))
     else {
       val instructions: mutable.ListBuffer[Instruction] =
         mutable.ListBuffer.empty
 
-      instructions += SubInstr(SP, SP, ImmVal(spaceRequired))
+      instructions += PendingStackOffset(SubInstr(SP, SP, ImmVal(spaceRequired)), stackFrameList.last)
 
       instructions
     }
@@ -116,7 +115,7 @@ object StackMachine {
             res = x
             found = true
           }
-          case None =>
+          case None => res = -999
         }
       }
     }
