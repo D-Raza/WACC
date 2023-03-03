@@ -5,22 +5,26 @@ import wacc.backend.Globals.{WORD_SIZE, PAIR_SIZE}
 import wacc.backend.Utils
 import scala.collection.mutable
 
+
 object CodeGenerator {
   def compileProgram(
       programNode: Program
   )(implicit state: CodeGenState): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
+    // FunctionDeclarationMap.compiledFunctions = (for (f <- programNode.funcs) yield f.ident.name -> f).toMap
+
     programNode.funcs.foreach(func => {
       implicit val printTable: Map[(Int, Int), Type] = func.printTable
       implicit val symbolTable: Map[Ident, Type] = func.symbolTable
       implicit val funcLabels = new Labels(func.ident.name)
+      implicit val functionTable: Map[Ident, (Type, List[Type])] = programNode.functionTable
       instructions ++= compileFunc(func)
     })
 
     implicit val printTable: Map[(Int, Int), Type] = programNode.printTable
     implicit val symbolTable: Map[Ident, Type] = programNode.symbolTable
-    // implicit val functionTable: Map[Ident, (Type, List[Type])] = programNode.functionTable
+    implicit val functionTable: Map[Ident, (Type, List[Type])] = programNode.functionTable
     implicit val mainLabels = new Labels("main")
 
     instructions ++= StackMachine.addStackFrame(programNode.symbolTable)
@@ -44,6 +48,7 @@ object CodeGenerator {
     instructions += Pop(List(PC))
 
     Utils.addUtils()(instructions)
+    //instructions ++= FunctionDeclarationMap.getAllCompiledFuncDefs.flatten
     mainLabels.addLabelInstructions(instructions)
 
     instructions
@@ -53,22 +58,30 @@ object CodeGenerator {
       state: CodeGenState,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
+      functionTable: Map[Ident, (Type, List[Type])],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
-
+    /*
     val funcSymbolTable = funcNode.symbolTable
     val funcPrintTable = funcNode.printTable
     val funcName: String = "wacc_" + funcNode.ident.name
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
-    // instructions.addAll(
-    //   List(
-    //     Label(funcName),
-    //     Push(List(LR))
+    FunctionDeclarationMap.setFuncAsCompiled(funcNode.ident.name)
 
-    //   )
-    // )
+    funcNode.stats.foreach(f)
 
+    val fNodeRef = FunctionDeclarationMap.functionReferenceMap(funcNode.ident.name)
+    val fBody = compileStat(fNodeRef.s)
+
+    
+
+
+
+    instructions += Label(funcName)
+    // instructions ++= compileStats(funcNode.paramList)
+    instructions += Label(".ltorg")
+    */
     mutable.ListBuffer.empty
   }
 
@@ -76,6 +89,7 @@ object CodeGenerator {
       state: CodeGenState,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
+      functionTable: Map[Ident, (Type, List[Type])],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -97,6 +111,7 @@ object CodeGenerator {
       state: CodeGenState,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
+      functionTable: Map[Ident, (Type, List[Type])],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -324,6 +339,7 @@ object CodeGenerator {
             state,
             printTable,
             whileNode.symbolTable,
+            functionTable,
             labels
           )
         )
@@ -360,6 +376,7 @@ object CodeGenerator {
       state: CodeGenState,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
+      functionTable: Map[Ident, (Type, List[Type])],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -402,8 +419,8 @@ object CodeGenerator {
 
       case NewPair(expr1, expr2) =>
         instructions ++= compileNewPair(expr1, expr2, resReg)
-      case Call(_, _) =>
-        instructions ++= compileFunctionCall(rValue.asInstanceOf[Call])
+      case call: Call =>
+        instructions ++= compileFunctionCall(call)
       case expr: Expr => instructions ++= compileExpr(expr, resReg)
       case pair: PairElem => {
         // instructions += Push(List(R8))
@@ -423,6 +440,7 @@ object CodeGenerator {
       state: CodeGenState,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
+      functionTable: Map[Ident, (Type, List[Type])],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -491,6 +509,7 @@ object CodeGenerator {
       state: CodeGenState,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
+      functionTable: Map[Ident, (Type, List[Type])],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -541,6 +560,7 @@ object CodeGenerator {
       state: CodeGenState,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
+      functionTable: Map[Ident, (Type, List[Type])],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -587,17 +607,71 @@ object CodeGenerator {
   }
 
   def compileFunctionCall(funcCallNode: Call)
-  // (implicit
-  //     state: CodeGenState,
-  //     printTable: Map[(Int, Int), Type],
-  //     symbolTable: Map[Ident, Type],
-  //     labels: Labels)
-      : mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
+   (implicit
+       state: CodeGenState,
+       printTable: Map[(Int, Int), Type],
+       symbolTable: Map[Ident, Type],
+       functionTable: Map[Ident, (Type, List[Type])],
+       labels: Labels) 
+      : mutable.ListBuffer[Instruction] = {
+        val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
+        val argsSize =  funcCallNode.args.foldLeft(0)((sum: Int, expr: Expr) => sum + expr.size)
+      
+
+        instructions += SubInstr(SP, SP, ImmVal(argsSize))
+        var offset = 0
+        val argsPushed: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
+
+
+        for (argument <- funcCallNode.args.reverse) {
+          // val argReg = state.getReg 
+          argsPushed ++= compileExpr(argument, R0)
+          argument.size match {
+            case Globals.BYTE_SIZE => {
+              argsPushed += StoreByte(R0, OffsetMode(SP, shiftAmount = ImmVal(offset)))
+              offset += Globals.BYTE_SIZE
+            }
+            
+            case _ => { 
+              argsPushed += Store(R0, OffsetMode(SP, shiftAmount = ImmVal(offset)))
+              offset += Globals.WORD_SIZE
+            }
+          }
+        }
+        
+        val functionName = funcCallNode.x.name
+        if (!FunctioDeclarationMap.functionDefined(functionName)) {
+          FunctionDeclarationMap.setFuncAsCompiled(functionName)
+
+          
+
+          val funcBodyDef = FunctionDeclarationMap.includeFuncBodyDef(functionName)
+
+          // val paramsList: List[Param] = funcCallNode.args.map((expr: ))
+
+         // val funcStackFrame = StackMachine.addStackFrame(symbolTable, functionTable.get(funcCallNode.x).)
+
+          val removeFrame = StackMachine.removeStackFrame()
+          
+          // FunctionDeclarationMap.includeFuncBodyDef(functionName, funcStackFrame ++ funcBodyDef ++ removeFrame) 
+        }
+
+        // val functionName = funcCallNode.x.name 
+
+        instructions ++= argsPushed
+        instructions += BranchAndLink("wacc_" + funcCallNode.x.name)
+        instructions += AddInstr(SP, SP, ImmVal(argsSize))
+    } 
+      
+
+      
+      
 
   def compileExpr(expr: Expr, resReg: Register)(implicit
       state: CodeGenState,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
+      functionTable: Map[Ident, (Type, List[Type])],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -924,6 +998,7 @@ object CodeGenerator {
       state: CodeGenState,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
+      functionTable: Map[Ident, (Type, List[Type])],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -954,6 +1029,7 @@ object CodeGenerator {
         state,
         printTable,
         ifNode.elseSymbolTable,
+        functionTable,
         labels
       )
     )
@@ -973,6 +1049,7 @@ object CodeGenerator {
         state,
         printTable,
         ifNode.thenSymbolTable,
+        functionTable,
         labels
       )
     )
