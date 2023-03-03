@@ -11,15 +11,6 @@ object CodeGenerator {
   )(implicit state: CodeGenState): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
-    programNode.funcs.foreach(func => {
-      implicit val printTable: Map[(Int, Int), Type] = func.printTable
-      implicit val symbolTable: Map[Ident, Type] = func.symbolTable
-      implicit val funcLabels = new Labels(func.ident.name)
-      implicit val functionTable: Map[Ident, (Type, List[Type])] =
-        programNode.functionTable
-      instructions ++= compileFunc(func)
-    })
-
     implicit val printTable: Map[(Int, Int), Type] = programNode.printTable
     implicit val symbolTable: Map[Ident, Type] = programNode.symbolTable
     implicit val functionTable: Map[Ident, (Type, List[Type])] =
@@ -47,8 +38,12 @@ object CodeGenerator {
     instructions += Pop(List(PC))
 
     Utils.addUtils()(instructions)
+    
+    programNode.funcs.foreach(func => {
+      instructions ++= compileFunc(func)(state, func.printTable, func.symbolTable, programNode.functionTable, new Labels(func.ident.name))
+    })
+    
     mainLabels.addLabelInstructions(instructions)
-
     instructions
   }
 
