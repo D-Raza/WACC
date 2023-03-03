@@ -1,6 +1,6 @@
 package wacc.backend
 
-import wacc.AST.Ident
+import wacc.AST._
 import scala.collection._
 
 // highestReg is the highest register that has been used so far
