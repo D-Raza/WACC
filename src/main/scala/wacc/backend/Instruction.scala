@@ -10,6 +10,8 @@ sealed trait Instruction {
   def putOnStack(offset: Int): Instruction = this match {
     case Load(destReg, addrMode, cond) =>
       Load(destReg, addrMode.putOnStack(offset), cond)
+    case LoadByte(destReg, addrMode, cond) =>
+      LoadByte(destReg, addrMode.putOnStack(offset), cond)
     case Store(srcReg, addrMode, cond) =>
       Store(srcReg, addrMode.putOnStack(offset), cond)
     case StoreByte(srcReg, addrMode, cond) =>

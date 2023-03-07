@@ -118,6 +118,12 @@ object CodeGenerator {
       case Skip() => instructions
 
       case Declare(ty, ident, rValue) => {
+        if (state.identToReg.contains(ident)) {
+          state.identToReg -= ident
+        } else if (StackMachine.stackFrameList.last.declaredVarMap.contains(ident)) {
+          StackMachine.stackFrameList.last.declaredVarMap -= ident
+        }
+        
         state.getRegOrNone match {
           case Some(scratchReg) => {
             instructions ++= compileRValue(rValue, scratchReg)
@@ -255,7 +261,6 @@ object CodeGenerator {
           case Some(IntType()) =>
             if (!Utils.printIntFlag) {
               Utils.printIntFlag = true
-              labels.addDataMsg("%d\u0000")
             }
             instructions += BranchAndLink("_printi")
           case Some(CharType()) =>
@@ -274,7 +279,6 @@ object CodeGenerator {
           case _ =>
             if (!Utils.printPFlag) {
               Utils.printPFlag = true
-              labels.addDataMsg("%p\u0000")
             }
             instructions += BranchAndLink("_printp")
         }
@@ -330,6 +334,8 @@ object CodeGenerator {
         val uniqueWhileName = "while_" + state.getNewLabelId;
         val condLabel = uniqueWhileName + "_cond"
         val bodyLabel = uniqueWhileName + "_body"
+        
+        // TODO: oldDeclaredVars and oldAvailableRegs
         val oldIdentToReg: mutable.Map[Ident, Register] = mutable.Map.empty
         oldIdentToReg ++= state.identToReg
 
@@ -366,12 +372,22 @@ object CodeGenerator {
 
       case scopeNode @ Scope(stats) => {
 
+        val oldAvailableRegs = state.availableRegs
         val oldIdentToReg: mutable.Map[Ident, Register] = mutable.Map.empty
-
         oldIdentToReg ++= state.identToReg
+        val oldDeclaredVars: Map[Ident, Int] = StackMachine.stackFrameList.last.declaredVarMap
+        
         instructions += Comment(
           "Scope: symbolTable = " + scopeNode.symbolTable + " sf " + StackMachine.stackFrameList.size
         )
+
+        instructions ++= (
+        List(
+          Push(List(FP)),
+          Move(FP, SP)
+          )
+        )
+
         instructions ++= StackMachine.addStackFrame(scopeNode.symbolTable)
         instructions ++= compileStats(stats)(
           state,
@@ -381,9 +397,15 @@ object CodeGenerator {
           labels
         )
         instructions ++= StackMachine.removeStackFrame()
+
+        instructions += Pop(List(FP))
+        
+        state.availableRegs = oldAvailableRegs
+        state.identToReg.clear()
         oldIdentToReg.foreach { case (id, reg) =>
           state.identToReg += (id -> reg)
         }
+        StackMachine.stackFrameList.last.declaredVarMap = oldDeclaredVars
       }
     }
     instructions
@@ -551,7 +573,11 @@ object CodeGenerator {
         }
 
         if (load) {
-          instructions += BranchAndLink("_arrLoad")
+            print(s"load: $lValue ${getLValueSize(lValue)}")
+            getLValueSize(lValue) match {
+              case 1 => instructions += BranchAndLink("_arrLoadB")
+              case _ => instructions += BranchAndLink("_arrLoad")
+            }
         } else {
           if (assignByte) {
             instructions += BranchAndLink("_arrStoreB")
@@ -936,7 +962,7 @@ object CodeGenerator {
       case Null() =>
         instructions += Move(resReg, ImmVal(0))
 
-      case ArrayElem(ident: Ident, xs: List[Expr]) => {
+      case a @ ArrayElem(ident: Ident, xs: List[Expr]) => {
         Utils.arrayFlag = true
 
         xs match {
@@ -949,20 +975,37 @@ object CodeGenerator {
             state.identToReg.get(ident) match {
               case Some(reg) => if (reg != R3) instructions += Move(R3, reg)
               case None =>
-                instructions += PendingStackOffset(
-                  Load(
-                    R3,
-                    OffsetMode(
-                      FP,
-                      shiftAmount = ImmVal(StackMachine.getIdentOffset(ident))
-                    )
-                  ),
-                  StackMachine.stackFrameList.last
-                )
+                symbolTable.get(ident).get.size match {
+                  case 1 =>  instructions += PendingStackOffset(
+                                      LoadByte(
+                                        R3,
+                                        OffsetMode(
+                                          FP,
+                                          shiftAmount = ImmVal(StackMachine.getIdentOffset(ident))
+                                        )
+                                      ),
+                                      StackMachine.stackFrameList.last
+                                    )
+                  case _ => instructions += PendingStackOffset(
+                                      Load(
+                                        R3,
+                                        OffsetMode(
+                                          FP,
+                                          shiftAmount = ImmVal(StackMachine.getIdentOffset(ident))
+                                        )
+                                      ),
+                                      StackMachine.stackFrameList.last
+                                    )
+                }
+                
+
             }
 
             instructions ++= List(
-              BranchAndLink("_arrLoad"),
+              a.actualSize match {
+                case 1 => BranchAndLink("_arrLoadB")
+                case _ => BranchAndLink("_arrLoad")
+              },
               (if (tail == Nil) Move(resReg, R3) else Move(state.tmp, R3))
             )
 
@@ -981,7 +1024,10 @@ object CodeGenerator {
 
                 instructions ++= List(
                   Move(R3, state.tmp),
-                  BranchAndLink("_arrLoad"),
+                  a.actualSize match {
+                    case 1 => BranchAndLink("_arrLoadB")
+                    case _ => BranchAndLink("_arrLoad")
+                  },
                   if (i == tail.length - 1) Move(resReg, R3) else Move(R10, R3)
                 )
 
@@ -1013,6 +1059,8 @@ object CodeGenerator {
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
+
+    // TODO: change ident to reg assignement to new implementation
     val oldIdentToReg: mutable.Map[Ident, Register] = mutable.Map.empty
 
     oldIdentToReg ++= state.identToReg
@@ -1074,9 +1122,9 @@ object CodeGenerator {
   }
 
   def compileIdent(ident: Ident, resReg: Register)(implicit
-      state: CodeGenState
+      state: CodeGenState,
       // printTable: Map[(Int, Int), Type],
-      // symbolTable: Map[Ident, Type],
+      symbolTable: Map[Ident, Type],
       // labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -1086,16 +1134,33 @@ object CodeGenerator {
           instructions += Move(resReg, reg)
 
       case None =>
-        instructions += PendingStackOffset(
-          Load(
-            resReg,
-            OffsetMode(
-              FP,
-              shiftAmount = ImmVal(StackMachine.getIdentOffset(ident))
+        symbolTable.get(ident).get.size match {
+          case 1 => {
+            instructions += PendingStackOffset(
+              LoadByte(
+                resReg,
+                OffsetMode(
+                  FP,
+                  shiftAmount = ImmVal(StackMachine.getIdentOffset(ident))
+                )
+              ),
+              StackMachine.stackFrameList.last
             )
-          ),
-          StackMachine.stackFrameList.last
-        )
+          }
+          case _ => {
+            instructions += PendingStackOffset(
+              Load(
+                resReg,
+                OffsetMode(
+                  FP,
+                  shiftAmount = ImmVal(StackMachine.getIdentOffset(ident))
+                )
+              ),
+              StackMachine.stackFrameList.last
+            )
+          }
+        
+        }
     }
     instructions
   }

@@ -138,10 +138,10 @@ class StackFrame(symbolTable: Map[Ident, Type], paramList: List[Param]) {
       offset += param.ty.size
     }
 
-    for ((ident, ty) <- symbolTable) {
-      map += (ident -> offset)
-      offset += ty.size
-    }
+    // for ((ident, ty) <- symbolTable) {
+    //   map += (ident -> offset)
+    //   offset += ty.size
+    // }
 
     map
   }

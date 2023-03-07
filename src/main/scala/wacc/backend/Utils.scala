@@ -65,6 +65,7 @@ object Utils {
       arrStore()
       arrStoreB()
       arrLoad()
+      arrLoadB()
       boundsCheck()
     }
     if (intErrOverflowFlag) {
@@ -435,6 +436,42 @@ object Utils {
       )
     )
   }
+
+  private def arrLoadB()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): Unit = {
+    instructions.addAll(
+      List(
+        Label("_arrLoadB"),
+        Push(List(LR)),
+        Cmp(R10, ImmVal(0)),
+        Move(R1, R10, Condition.LT),
+        BranchAndLink("_boundsCheck", Condition.LT),
+        LoadByte(LR, OffsetMode(baseReg = R3, shiftAmount = ImmVal(-4))),
+        Cmp(R10, LR),
+        Move(R1, R10, Condition.GE),
+        BranchAndLink("_boundsCheck", Condition.GE),
+        LoadByte(
+          R3,
+          OffsetMode(R3, Some(R10))
+        ), // ldr r3, [r3, r10, lsl #2]
+        Pop(List(PC))
+      )
+    )
+  }
+
+	// _arrLoadB:
+  // @ Special calling convention: array ptr passed in R3, index in R10, LR (R14) is used as general register, and return into R3
+  // push {lr}
+  // cmp r10, #0
+  // movlt r1, r10
+  // bllt _boundsCheck
+  // ldr lr, [r3, #-4]
+  // cmp r10, lr
+  // movge r1, r10
+  // blge _boundsCheck
+  // ldrsb r3, [r3, r10]
+  // pop {pc}
 
   private def boundsCheck()(implicit
       instructions: mutable.ListBuffer[Instruction]
