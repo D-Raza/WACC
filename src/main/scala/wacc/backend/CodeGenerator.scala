@@ -238,9 +238,29 @@ object CodeGenerator {
         Utils.freePairFlag = true
         Utils.errNullFlag = true
         Utils.printStringFlag = true
-        instructions ++= compileExpr(expr, state.tmp)
-        instructions += Move(R0, state.tmp)
-        instructions += BranchAndLink("_freepair")
+        
+        instructions += Push(List(R0))
+        expr match {
+          case ident: Ident => {
+            symbolTable.get(ident) match {
+              case Some(PairType(_, _)) => {
+                instructions ++= compileExpr(expr, state.tmp)
+                instructions += Move(R0, state.tmp)
+                instructions += BranchAndLink("_freepair")
+              }
+              case Some(ArrayType(_)) => {
+                instructions ++= compileExpr(expr, state.tmp)
+                instructions += SubInstr(R0, state.tmp, ImmVal(4))
+                instructions += BranchAndLink("free")
+              }
+              case _ => throw new Exception("Freeing non-pair or non-array")
+              }
+            }
+          case _ => throw new Exception("Freeing non-pair or non-array")
+        }
+        instructions += Pop(List(R0))
+
+
       }
 
       case Return(expr) => {

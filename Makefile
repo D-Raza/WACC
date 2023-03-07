@@ -1,4 +1,4 @@
-milestone := "wacc_examples/valid/!(array|function|advanced)"
+milestone := "wacc_examples/valid/!(function|advanced)"
 all: build
 
 lint:
