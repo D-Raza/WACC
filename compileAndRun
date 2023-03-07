@@ -1,0 +1,22 @@
+#!/bin/bash
+
+filepath=$1
+filename=$(basename -- $filepath)
+filename_no_ext="${filename%.*}"
+
+# Compile the file
+#./compile $filepath > /dev/null
+
+# Run the file
+arm-linux-gnueabi-gcc -o "$filename_no_ext" -mcpu=arm1176jzf-s -mtune=arm1176jzf-s "$filename_no_ext.s"
+
+# Run executable
+qemu-arm -L /usr/arm-linux-gnueabi/ $filename_no_ext
+
+# Remove the .s file
+# rm $filename_no_ext.s
+
+# Remove the executable
+sleep 0.1
+rm $filename_no_ext
+

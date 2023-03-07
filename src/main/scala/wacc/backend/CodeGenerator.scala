@@ -61,22 +61,34 @@ object CodeGenerator {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
     val funcNameLabel = "wacc_" + funcNode.ident.name 
 
-    val paramsAndRegs = funcNode.paramList zip List(R0, R1, R2, R3, R4) 
+    val paramsAndRegs = funcNode.paramList zip List(R0, R1, R2, R3) // no R4
 
     paramsAndRegs.foreach{case ((Param(_, ident), reg)) => state.identToReg += (ident -> reg)}
 
     instructions ++= List( 
       Label(funcNameLabel),
       Push(List(FP, LR)),
+      Push(List(R4, R5, R6, R7)),
       Move(FP, SP)
     )
 
     StackMachine.addStackFrame(funcNode.symbolTable, funcNode.paramList, true)
     instructions ++= compileStats(funcNode.stats)(state, printTable, symbolTable, functionTable, labels)
+    // instructions.mapInPlace(instr =>
+    //   instr match {
+    //     case PendingStackOffset(instr, sf) => {
+    //       println(s"putting instruction $instr on stack at offset ${sf.currVarOffset}")
+    //       instr.putOnStack(sf.currVarOffset)
+    //     }
+
+    //     case _ => instr
+    //   }
+    // )
     StackMachine.removeStackFrame(true)
     
     instructions ++= List(
       Move(SP, FP), 
+      Pop(List(R4, R5, R6, R7)),
       Pop(List(FP, PC)),
       Directive("ltorg")
     )
@@ -274,10 +286,22 @@ object CodeGenerator {
       }
 
       case Print(expr) => {
+        val exprType: Option[Type] = expr match {
+        case ident: Ident => {
+          symbolTable.get(ident) match {
+            case Some(ty) => Some(ty)
+            case None => printTable.get(expr.pos)
+          }
+        }
+        case _ => {
+          printTable.get(expr.pos)
+        }
+      }
+      
         instructions ++= compileExpr(expr, state.tmp)
         instructions += Push(List(R0, R1, R2, R3))
         instructions += Move(R0, state.tmp)
-        printTable.get(expr.pos) match {
+        exprType match {
           case Some(IntType()) =>
             if (!Utils.printIntFlag) {
               Utils.printIntFlag = true
@@ -297,6 +321,8 @@ object CodeGenerator {
             instructions += BranchAndLink("_printb")
 
           case _ =>
+            println(s"Print: $expr, type: ${printTable.get(expr.pos)}")
+            println(s"symboltable: $symbolTable")
             if (!Utils.printPFlag) {
               Utils.printPFlag = true
             }
@@ -306,10 +332,22 @@ object CodeGenerator {
       }
 
       case Println(expr) => {
+        val exprType: Option[Type] = expr match {
+          case ident: Ident => {
+            symbolTable.get(ident) match {
+              case Some(ty) => Some(ty)
+              case None => printTable.get(expr.pos)
+            }
+          }
+          case _ => {
+            printTable.get(expr.pos)
+          }
+        }
+        
         instructions ++= compileExpr(expr, state.tmp)
         instructions += Push(List(R0, R1, R2, R3))
         instructions += Move(R0, state.tmp)
-        printTable.get(expr.pos) match {
+        exprType match {
           case Some(IntType()) =>
             if (!Utils.printIntFlag) {
               Utils.printIntFlag = true
@@ -333,6 +371,8 @@ object CodeGenerator {
             }
             instructions += BranchAndLink("_printb")
           case _ =>
+            println("Println: " + expr + ", type: " + printTable.get(expr.pos))
+            println(s"symboltable: $symbolTable")
             if (!Utils.printPFlag) {
               Utils.printPFlag = true
               labels.addDataMsg("%p\u0000")
@@ -428,6 +468,8 @@ object CodeGenerator {
     }
     instructions
   }
+
+  // private def printExpr(printLine: Boolean, )
 
   def compileRValue(rValue: RValue, resReg: Register)(implicit
       state: CodeGenState,
@@ -677,39 +719,53 @@ object CodeGenerator {
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
-    val argsSize =
-    funcCallNode.args.foldLeft(0)((sum: Int, expr: Expr) => sum + expr.size)
-
-    instructions += SubInstr(SP, SP, ImmVal(argsSize))
-    // sub stack pointer by size of args (handled by stack machine)
-    // reverse the args (order that theyre pushed in stack)
+    // val argsSize = funcCallNode.args.foldLeft(0)((sum: Int, expr: Expr) => sum + expr.size)
+    val numArgs = funcCallNode.args.length
+    var argShift = 0
+ 
     // push the reversed args onto stack 
     // add stack pointer back to original pos (handled by stack machine)
     // move resreg r0 (handled by assign)
-
+ 
+    instructions += Push(List(R0, R1, R2, R3))
     instructions += Comment("Pushing arguments onto stack")
-    
+ 
     instructions ++= StackMachine.addStackFrame(symbolTable)
+ 
+ 
+    val regs = mutable.Stack(R0, R1, R2, R3)
+    val regsLength = regs.length
     
-    val regs = mutable.Stack(R0, R1, R2, R3, R4)
-    for (argument <- funcCallNode.args.reverse) {
+    for (argument <- funcCallNode.args.take(regsLength)) {
       // instructions ++= compileExpr(argument, state.tmp)
       // instructions += Push(List(state.tmp))
-      
-      if (regs.isEmpty) {
-        instructions += Comment("TODO: handle more than 5 args")
-      } else {
-        // argsPushed ++= compileExpr(argument, state.tmp)
-        instructions ++= compileExpr(argument, regs.pop())
-      }
+      instructions ++= compileExpr(argument, regs.pop())
     }
 
+    if (regs.isEmpty) {
+      for (argument <- funcCallNode.args.drop(regsLength).reverse) {
+        val argSize = argument.size
+        argShift += argSize
+        instructions ++= compileExpr(argument, state.tmp) // mov r8, arg
+        if (argSize == 1) {
+          instructions += StoreByte(state.tmp, PostIndexedMode(SP, shiftAmount = ImmVal(-argSize))) //strb r8 [sp, -1]!
+        } else {
+          instructions += Store(state.tmp, PostIndexedMode(SP, shiftAmount = ImmVal(-argSize))) //str r8 [sp, -4]!
+        }
+      }
+    }
+ 
     // instructions ++= argsPushed
     instructions += BranchAndLink("wacc_" + funcCallNode.x.name)
     instructions += Move(resReg, R0)
-
-    instructions += AddInstr(SP, SP, ImmVal(argsSize))
+ 
+    if (numArgs > regsLength) {
+      instructions += AddInstr(SP, SP, ImmVal(argShift))
+    }
+ 
     instructions ++= StackMachine.removeStackFrame(true)
+    instructions += Pop(List(R0, R1, R2, R3))
+
   }
 
   def compileExpr(expr: Expr, resReg: Register)(implicit
