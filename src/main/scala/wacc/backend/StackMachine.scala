@@ -42,6 +42,13 @@ object StackMachine {
           Move(FP, SP)
         )
       )
+    } else {
+        instructions ++= (
+        List(
+          Push(List(FP)),
+          Move(FP, SP)
+          )
+        )
     }
 
     instructions.addAll(assignStackSpace(stackFrameToAdd.currVarOffset))
@@ -64,6 +71,8 @@ object StackMachine {
         Pop(List(R4, R5, R6, R7, R8, R10, IP)),
         Pop(List(FP))
       )
+    } else {
+      instructions += Pop(List(FP))
     }
 
     // if (stackFrameList.length != 0) {

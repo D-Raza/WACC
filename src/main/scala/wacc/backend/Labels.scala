@@ -71,7 +71,4 @@ class Labels(var fname: String = "") {
       case _        => c.toString
     }
   }
-
-  // TODO:
-  // Deal with if/while messages
 }

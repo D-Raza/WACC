@@ -355,9 +355,12 @@ object CodeGenerator {
         val condLabel = uniqueWhileName + "_cond"
         val bodyLabel = uniqueWhileName + "_body"
         
-        // TODO: oldDeclaredVars and oldAvailableRegs
+        val oldAvailableRegs = state.availableRegs
         val oldIdentToReg: mutable.Map[Ident, Register] = mutable.Map.empty
         oldIdentToReg ++= state.identToReg
+        val oldDeclaredVars: Map[Ident, Int] = StackMachine.stackFrameList.last.declaredVarMap
+
+        instructions ++= StackMachine.addStackFrame(whileNode.symbolTable)
 
         instructions += Branch(condLabel)
 
@@ -385,9 +388,13 @@ object CodeGenerator {
           )
         )
 
+        instructions ++= StackMachine.removeStackFrame()
+        state.availableRegs = oldAvailableRegs
+        state.identToReg.clear()
         oldIdentToReg.foreach { case (id, reg) =>
           state.identToReg += (id -> reg)
         }
+        StackMachine.stackFrameList.last.declaredVarMap = oldDeclaredVars
       }
 
       case scopeNode @ Scope(stats) => {
@@ -401,13 +408,6 @@ object CodeGenerator {
           "Scope: symbolTable = " + scopeNode.symbolTable + " sf " + StackMachine.stackFrameList.size
         )
 
-        instructions ++= (
-        List(
-          Push(List(FP)),
-          Move(FP, SP)
-          )
-        )
-
         instructions ++= StackMachine.addStackFrame(scopeNode.symbolTable)
         instructions ++= compileStats(stats)(
           state,
@@ -417,8 +417,6 @@ object CodeGenerator {
           labels
         )
         instructions ++= StackMachine.removeStackFrame()
-
-        instructions += Pop(List(FP))
         
         state.availableRegs = oldAvailableRegs
         state.identToReg.clear()
@@ -1079,9 +1077,10 @@ object CodeGenerator {
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
-
-    // TODO: change ident to reg assignement to new implementation
+    val oldAvailableRegs = state.availableRegs
     val oldIdentToReg: mutable.Map[Ident, Register] = mutable.Map.empty
+    oldIdentToReg ++= state.identToReg
+    val oldDeclaredVars: Map[Ident, Int] = StackMachine.stackFrameList.last.declaredVarMap
 
     oldIdentToReg ++= state.identToReg
 
@@ -1101,7 +1100,7 @@ object CodeGenerator {
     )
 
     // Compile else statement
-    // instructions ++= StackMachine.addStackFrame(ifNode.elseSymbolTable)
+    instructions ++= StackMachine.addStackFrame(ifNode.elseSymbolTable)
     ifNode.elseStat.foreach(stat =>
       instructions ++= compileStat(stat)(
         state,
@@ -1111,7 +1110,7 @@ object CodeGenerator {
         labels
       )
     )
-    // instructions ++= StackMachine.removeStackFrame()
+    instructions ++= StackMachine.removeStackFrame()
 
     instructions.addAll(
       List(
@@ -1121,7 +1120,7 @@ object CodeGenerator {
     )
 
     // Compile then statement
-    // instructions ++= StackMachine.addStackFrame(ifNode.thenSymbolTable)
+    instructions ++= StackMachine.addStackFrame(ifNode.thenSymbolTable)
     ifNode.thenStat.foreach(stat =>
       instructions ++= compileStat(stat)(
         state,
@@ -1131,11 +1130,16 @@ object CodeGenerator {
         labels
       )
     )
-    // instructions ++= StackMachine.removeStackFrame()
+    instructions ++= StackMachine.removeStackFrame()
 
     instructions += Label(endLabel)
 
-    oldIdentToReg.foreach { case (id, reg) => state.identToReg += (id -> reg) }
+    state.availableRegs = oldAvailableRegs
+    state.identToReg.clear()
+    oldIdentToReg.foreach { case (id, reg) =>
+      state.identToReg += (id -> reg)
+    }
+    StackMachine.stackFrameList.last.declaredVarMap = oldDeclaredVars
 
     instructions
 
