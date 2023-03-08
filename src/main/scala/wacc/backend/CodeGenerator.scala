@@ -31,6 +31,7 @@ object CodeGenerator {
         case _ => instr
       }
     )
+
     instructions += Move(R0, ImmVal(0))
 
     instructions ++= StackMachine.removeStackFrame()
@@ -41,7 +42,7 @@ object CodeGenerator {
     val funcInstructions = mutable.ListBuffer.empty[Instruction]
     
     programNode.funcs.foreach(func => {
-      funcInstructions ++= compileFunc(func)(state, func.printTable, func.symbolTable, programNode.functionTable, new Labels(func.ident.name))
+      funcInstructions ++= compileFunc(func)(state, programNode.functionTable)
     })
     
     Utils.addUtils()(instructions)
@@ -53,10 +54,7 @@ object CodeGenerator {
 
   def compileFunc(funcNode: Func)(implicit
       state: CodeGenState,
-      printTable: Map[(Int, Int), Type],
-      symbolTable: Map[Ident, Type],
-      functionTable: Map[Ident, (Type, List[Type])],
-      labels: Labels
+      functionTable: Map[Ident, (Type, List[Type])]
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
     val funcNameLabel = "wacc_" + funcNode.ident.name 
@@ -72,21 +70,15 @@ object CodeGenerator {
       Move(FP, SP)
     )
 
+    state.exitLabel = funcNameLabel + "_exit"
     StackMachine.addStackFrame(funcNode.symbolTable, funcNode.paramList, true)
-    instructions ++= compileStats(funcNode.stats)(state, printTable, symbolTable, functionTable, labels)
-    // instructions.mapInPlace(instr =>
-    //   instr match {
-    //     case PendingStackOffset(instr, sf) => {
-    //       println(s"putting instruction $instr on stack at offset ${sf.currVarOffset}")
-    //       instr.putOnStack(sf.currVarOffset)
-    //     }
-
-    //     case _ => instr
-    //   }
-    // )
+    val funcLabels = new Labels(funcNode.ident.name)
+    instructions ++= compileStats(funcNode.stats)(state, funcNode.printTable, funcNode.symbolTable, functionTable, funcLabels)
+    funcLabels.addLabelInstructions(instructions)
     StackMachine.removeStackFrame(true)
-    
+
     instructions ++= List(
+      Label(state.exitLabel),
       Move(SP, FP), 
       Pop(List(R4, R5, R6, R7)),
       Pop(List(FP, PC)),
@@ -96,7 +88,7 @@ object CodeGenerator {
     instructions    
   }
 
-  def compileStats(stats: List[Stat])(implicit
+  def compileStats(stats: List[Stat], func: Boolean = false)(implicit
       state: CodeGenState,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
@@ -106,6 +98,30 @@ object CodeGenerator {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
     stats.foreach(instructions ++= compileStat(_))
+
+    // compileStat until a return statement is reached, unless inside an if block or while loop
+    // and do evaluate the return instruction
+    // var returnHit: Boolean = false
+    // var statsCopy = stats
+    // while (!returnHit && statsCopy.nonEmpty) {
+    //   val stat = statsCopy.head
+    //   statsCopy = statsCopy.tail
+    //   stat match {
+    //     case Return(_) => {
+    //       instructions ++= compileStat(stat)
+    //       returnHit = true
+    //     }
+    //     case If(_, _, _) => {
+    //       instructions ++= compileStat(stat)
+    //     }
+    //     case While(_, _) => {
+    //       instructions ++= compileStat(stat)
+    //     }
+    //     case _ => {
+    //       instructions ++= compileStat(stat)
+    //     }
+    //   }
+    // }
 
     instructions.mapInPlace(instr =>
       instr match {
@@ -278,6 +294,7 @@ object CodeGenerator {
       case Return(expr) => {
         instructions ++= compileExpr(expr, state.tmp)
         instructions += Move(R0, state.tmp)
+        instructions += BranchAndLink(state.exitLabel)
       }
       case Exit(expr) => {
         instructions ++= compileExpr(expr, state.tmp)
@@ -400,7 +417,7 @@ object CodeGenerator {
         oldIdentToReg ++= state.identToReg
         val oldDeclaredVars: Map[Ident, Int] = StackMachine.stackFrameList.last.declaredVarMap
 
-        instructions ++= StackMachine.addStackFrame(whileNode.symbolTable)
+        // instructions ++= StackMachine.addStackFrame(whileNode.symbolTable)
 
         instructions += Branch(condLabel)
 
@@ -428,7 +445,7 @@ object CodeGenerator {
           )
         )
 
-        instructions ++= StackMachine.removeStackFrame()
+        // instructions ++= StackMachine.removeStackFrame()
         state.availableRegs = oldAvailableRegs
         state.identToReg.clear()
         oldIdentToReg.foreach { case (id, reg) =>
@@ -1156,7 +1173,7 @@ object CodeGenerator {
     )
 
     // Compile else statement
-    instructions ++= StackMachine.addStackFrame(ifNode.elseSymbolTable)
+    // instructions ++= StackMachine.addStackFrame(ifNode.elseSymbolTable)
     ifNode.elseStat.foreach(stat =>
       instructions ++= compileStat(stat)(
         state,
@@ -1166,7 +1183,7 @@ object CodeGenerator {
         labels
       )
     )
-    instructions ++= StackMachine.removeStackFrame()
+    // instructions ++= StackMachine.removeStackFrame()
 
     instructions.addAll(
       List(
@@ -1176,7 +1193,7 @@ object CodeGenerator {
     )
 
     // Compile then statement
-    instructions ++= StackMachine.addStackFrame(ifNode.thenSymbolTable)
+    // instructions ++= StackMachine.addStackFrame(ifNode.thenSymbolTable)
     ifNode.thenStat.foreach(stat =>
       instructions ++= compileStat(stat)(
         state,
@@ -1186,7 +1203,7 @@ object CodeGenerator {
         labels
       )
     )
-    instructions ++= StackMachine.removeStackFrame()
+    // instructions ++= StackMachine.removeStackFrame()
 
     instructions += Label(endLabel)
 

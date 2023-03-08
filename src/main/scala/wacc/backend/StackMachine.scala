@@ -30,14 +30,7 @@ object StackMachine {
       stackFrameToAdd.currVarOffset = -24 // FP, LR, R4, R5, R6, R7 pushed on stack at start
 
     stackFrameList += stackFrameToAdd
-
-    // if (stackFrameList.length == 1) {
-    //   instructions += Push(List(FP, LR))
-    // }
-    // instructions += Push(List(R4, R5, R6, R7, R8, R10, IP))
-    // if (stackFrameList.length == 1) {
-    //   instructions += Move(FP, SP)
-    // }
+    
     if (!isFun && stackFrameList.length == 1) {
       instructions.addAll(
         List(
