@@ -50,6 +50,7 @@ object SemanticAnalyser {
               func.stats,
               Some(func.ty)
             )
+          func.printTable = statPrintTable
           errors ++= statErrors
           localPrintTable ++= statPrintTable
           func.symbolTable ++= statSymbolTable

@@ -38,7 +38,6 @@ case class CodeGenState() {
     }
   }
 
-  // Replacement for getScratchReg
   def getRegOrNone: Option[Register] = {
     if (availableRegs.isEmpty) None
     else {
@@ -50,20 +49,13 @@ case class CodeGenState() {
     }
   }
 
-  // Register most recently allocated to
-  val recentReg1 = R0
-
-  // Register 2nd most recently allocated to
-  val recentReg2 = R0
-
   val scratchRegs: mutable.Stack[Register] =
     mutable.Stack(R4, R5, R6, R7, R0, R1, R2, R3)
   val tmp: Register = R8
   val tmp2: Register = R9
   val tmp3: Register = IP
 
-  def getScratchReg: Option[Register] =
-    if (scratchRegs.isEmpty) None else Some(scratchRegs.pop())
+  var funcLabel: String = "main"
 
   val identToReg: mutable.Map[Ident, Register] = mutable.Map.empty
 
