@@ -749,14 +749,16 @@ object CodeGenerator {
  
     instructions ++= StackMachine.addStackFrame(symbolTable)
  
- 
     val regs = mutable.Stack(R0, R1, R2, R3)
     val regsLength = regs.length
     
-    for (argument <- funcCallNode.args.take(regsLength)) {
-      // instructions ++= compileExpr(argument, state.tmp)
-      // instructions += Push(List(state.tmp))
-      instructions ++= compileExpr(argument, regs.pop())
+    for (argument <- funcCallNode.args.take(regsLength).reverse) {
+      instructions ++= compileExpr(argument, state.tmp)
+      instructions += Push(List(state.tmp))
+    }
+
+    for (argument <- funcCallNode.args.take(regsLength).reverse) {
+      instructions += Pop(List(regs.pop()))
     }
 
     if (regs.isEmpty) {
@@ -771,8 +773,7 @@ object CodeGenerator {
         }
       }
     }
- 
-    // instructions ++= argsPushed
+
     instructions += BranchAndLink("wacc_" + funcCallNode.x.name)
     instructions += Move(resReg, R0)
  
