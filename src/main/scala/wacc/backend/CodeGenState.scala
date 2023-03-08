@@ -3,8 +3,6 @@ package wacc.backend
 import wacc.AST._
 import scala.collection._
 
-// highestReg is the highest register that has been used so far
-
 case class CodeGenState() {
   private val labelIdGenerator: Iterator[Int] = Iterator.from(0)
   def getNewLabelId: Int = labelIdGenerator.next()
@@ -18,7 +16,7 @@ case class CodeGenState() {
     R1,
     R2,
     R3
-  ) // R9, R10, R4, R5, R6, R7, R0, R1, R2, R3, R8)
+  )
 
   var usedRegs: List[Register] = List.empty
 

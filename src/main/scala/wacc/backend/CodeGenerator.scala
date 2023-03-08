@@ -17,7 +17,6 @@ object CodeGenerator {
       programNode.functionTable
     implicit val mainLabels = new Labels("main")
 
-    instructions += Comment("Scope: symbolTable = " + programNode.symbolTable)
     instructions ++= StackMachine.addStackFrame(programNode.symbolTable)
 
     instructions ++= compileStats(programNode.stat)
@@ -61,7 +60,7 @@ object CodeGenerator {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
     val funcNameLabel = "wacc_" + funcNode.ident.name
 
-    val paramsAndRegs = funcNode.paramList zip List(R0, R1, R2, R3) // no R4
+    val paramsAndRegs = funcNode.paramList zip List(R0, R1, R2, R3)
 
     paramsAndRegs.foreach { case ((Param(_, ident), reg)) =>
       state.identToReg += (ident -> reg)
@@ -109,30 +108,6 @@ object CodeGenerator {
 
     stats.foreach(instructions ++= compileStat(_))
 
-    // compileStat until a return statement is reached, unless inside an if block or while loop
-    // and do evaluate the return instruction
-    // var returnHit: Boolean = false
-    // var statsCopy = stats
-    // while (!returnHit && statsCopy.nonEmpty) {
-    //   val stat = statsCopy.head
-    //   statsCopy = statsCopy.tail
-    //   stat match {
-    //     case Return(_) => {
-    //       instructions ++= compileStat(stat)
-    //       returnHit = true
-    //     }
-    //     case If(_, _, _) => {
-    //       instructions ++= compileStat(stat)
-    //     }
-    //     case While(_, _) => {
-    //       instructions ++= compileStat(stat)
-    //     }
-    //     case _ => {
-    //       instructions ++= compileStat(stat)
-    //     }
-    //   }
-    // }
-
     instructions.mapInPlace(instr =>
       instr match {
         case PendingStackOffset(instr, sf) =>
@@ -178,13 +153,9 @@ object CodeGenerator {
             )
           }
         }
-        instructions += Comment(
-          "identToRegs: " + state.identToReg + "declaredVarMap: " + StackMachine.stackFrameList.last.declaredVarMap
-        )
       }
 
       case Assign(lValue, rValue) => {
-        instructions += Comment("Assign: compiling RVALUE " + rValue)
         instructions ++= compileRValue(rValue, state.tmp)
 
         var assignByte = getLValueSize(lValue) == 1
@@ -217,7 +188,6 @@ object CodeGenerator {
             }
           }
           case _: PairElem => {
-            instructions += Comment("Assign: compiling LVALUE " + lValue)
             instructions ++= compileLValue(lValue, state.tmp2, assignByte)
             instructions += (if (assignByte)
                                StoreByte(state.tmp, OffsetMode(state.tmp2))
@@ -249,7 +219,7 @@ object CodeGenerator {
             instructions += BranchAndLink("_readc")
           }
 
-          case _ => //
+          case _ => throw new Exception("Read: invalid type")
         }
 
         lValue match {
@@ -313,104 +283,9 @@ object CodeGenerator {
         instructions += BranchAndLink("exit")
       }
 
-      case Print(expr) => {
-        val exprType: Option[Type] = expr match {
-          case ident: Ident => {
-            symbolTable.get(ident) match {
-              case Some(ty) => Some(ty)
-              case None     => printTable.get(expr.pos)
-            }
-          }
-          case _ => {
-            printTable.get(expr.pos)
-          }
-        }
+      case Print(expr) => instructions ++= genPrint(expr)
 
-        instructions ++= compileExpr(expr, state.tmp)
-        instructions += Push(List(R0, R1, R2, R3))
-        instructions += Move(R0, state.tmp)
-        exprType match {
-          case Some(IntType()) =>
-            if (!Utils.printIntFlag) {
-              Utils.printIntFlag = true
-            }
-            instructions += BranchAndLink("_printi")
-          case Some(CharType()) =>
-            if (!Utils.printCharFlag)
-              Utils.printCharFlag = true
-            instructions += BranchAndLink("_printc")
-          case Some(StringType()) | Some(ArrayType(CharType())) =>
-            if (!Utils.printStringFlag)
-              Utils.printStringFlag = true
-            instructions += BranchAndLink("_prints")
-          case Some(BoolType()) =>
-            if (!Utils.printBoolFlag)
-              Utils.printBoolFlag = true
-            instructions += BranchAndLink("_printb")
-
-          case _ =>
-            println(s"Print: $expr, type: ${printTable.get(expr.pos)}")
-            println(s"symboltable: $symbolTable")
-            if (!Utils.printPFlag) {
-              Utils.printPFlag = true
-            }
-            instructions += BranchAndLink("_printp")
-        }
-        instructions += Pop(List(R0, R1, R2, R3))
-      }
-
-      case Println(expr) => {
-        val exprType: Option[Type] = expr match {
-          case ident: Ident => {
-            symbolTable.get(ident) match {
-              case Some(ty) => Some(ty)
-              case None     => printTable.get(expr.pos)
-            }
-          }
-          case _ => {
-            printTable.get(expr.pos)
-          }
-        }
-
-        instructions ++= compileExpr(expr, state.tmp)
-        instructions += Push(List(R0, R1, R2, R3))
-        instructions += Move(R0, state.tmp)
-        exprType match {
-          case Some(IntType()) =>
-            if (!Utils.printIntFlag) {
-              Utils.printIntFlag = true
-              labels.addDataMsg("%d\u0000")
-            }
-            instructions += BranchAndLink("_printi")
-          case Some(CharType()) =>
-            if (!Utils.printCharFlag) {
-              Utils.printCharFlag = true
-            }
-            instructions += BranchAndLink("_printc")
-          case Some(StringType()) | Some(ArrayType(CharType())) =>
-            if (!Utils.printStringFlag)
-              Utils.printStringFlag = true
-            instructions += BranchAndLink("_prints")
-          case Some(BoolType()) =>
-            if (!Utils.printBoolFlag) {
-              Utils.printBoolFlag = true
-              labels.addDataMsg("false\u0000")
-              labels.addDataMsg("true\u0000")
-            }
-            instructions += BranchAndLink("_printb")
-          case _ =>
-            println("Println: " + expr + ", type: " + printTable.get(expr.pos))
-            println(s"symboltable: $symbolTable")
-            if (!Utils.printPFlag) {
-              Utils.printPFlag = true
-              labels.addDataMsg("%p\u0000")
-            }
-            instructions += BranchAndLink("_printp")
-        }
-        Utils.printlnFlag = true
-        instructions += BranchAndLink("_println")
-        instructions += Pop(List(R0, R1, R2, R3))
-      }
+      case Println(expr) => instructions ++= genPrint(expr, true)
 
       case ifStatNode @ If(_, _, _) =>
         instructions ++= compileIfStat(
@@ -428,8 +303,6 @@ object CodeGenerator {
         oldIdentToReg ++= state.identToReg
         val oldDeclaredVars: Map[Ident, Int] =
           StackMachine.stackFrameList.last.declaredVarMap
-
-        // instructions ++= StackMachine.addStackFrame(whileNode.symbolTable)
 
         instructions += Branch(condLabel)
 
@@ -457,7 +330,6 @@ object CodeGenerator {
           )
         )
 
-        // instructions ++= StackMachine.removeStackFrame()
         state.availableRegs = oldAvailableRegs
         state.identToReg.clear()
         oldIdentToReg.foreach { case (id, reg) =>
@@ -473,10 +345,6 @@ object CodeGenerator {
         oldIdentToReg ++= state.identToReg
         val oldDeclaredVars: Map[Ident, Int] =
           StackMachine.stackFrameList.last.declaredVarMap
-
-        instructions += Comment(
-          "Scope: symbolTable = " + scopeNode.symbolTable + " sf " + StackMachine.stackFrameList.size
-        )
 
         instructions ++= StackMachine.addStackFrame(scopeNode.symbolTable)
         instructions ++= compileStats(stats)(
@@ -498,8 +366,6 @@ object CodeGenerator {
     }
     instructions
   }
-
-  // private def printExpr(printLine: Boolean, )
 
   def compileRValue(rValue: RValue, resReg: Register)(implicit
       state: CodeGenState,
@@ -551,11 +417,8 @@ object CodeGenerator {
       case call: Call =>
         instructions ++= compileFunctionCall(call, resReg)
       case expr: Expr => instructions ++= compileExpr(expr, resReg)
-      case pair: PairElem => {
-        // instructions += Push(List(R8))
+      case pair: PairElem =>
         instructions ++= getPairElem(pair, resReg, unpack = true)
-        // instructions += Pop(List(R8))
-      }
     }
 
     instructions
@@ -648,7 +511,7 @@ object CodeGenerator {
       case ArrayElem(ident: Ident, xs: List[Expr]) =>
         Utils.arrayFlag = true
 
-        instructions ++= compileExpr(xs.head, R10) // TODO: multidimensional
+        instructions ++= compileExpr(xs.head, R10)
 
         if (resReg != R3)
           instructions += Push(List(R3))
@@ -749,7 +612,6 @@ object CodeGenerator {
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
-    // val argsSize = funcCallNode.args.foldLeft(0)((sum: Int, expr: Expr) => sum + expr.size)
     val numArgs = funcCallNode.args.length
     var argShift = 0
 
@@ -1040,12 +902,10 @@ object CodeGenerator {
       }
       case Ord(x) => {
         instructions ++= compileExpr(x, resReg)
-        // instructions += AndInstr(resReg, operand1Reg, ImmVal(255))
       }
 
       case Chr(x) => {
         instructions ++= compileExpr(x, resReg)
-        // instructions += AndInstr(resReg, operand1Reg, ImmVal(255))
       }
 
       case IntegerLiter(x) =>
@@ -1059,7 +919,6 @@ object CodeGenerator {
       }
 
       case CharLiter(x) => {
-        // instructions += Move(resReg, ImmVal(x.toInt))
         instructions += Move(resReg, ImmChar(x))
       }
 
@@ -1130,7 +989,6 @@ object CodeGenerator {
                 if (resReg != R3)
                   instructions += Push(List(R3))
 
-                // should encapsulate with push and pop r8s
                 instructions += Push(List(state.tmp))
                 instructions ++= compileExpr(dimIndex, R10)
                 instructions += Pop(List(state.tmp))
@@ -1149,10 +1007,8 @@ object CodeGenerator {
               }
             })
           }
-          case Nil => {
-            // should not happen
+          case Nil =>
             throw new Exception("ArrayElem with no dimensions")
-          }
         }
 
         instructions
@@ -1196,7 +1052,6 @@ object CodeGenerator {
     )
 
     // Compile else statement
-    // instructions ++= StackMachine.addStackFrame(ifNode.elseSymbolTable)
     ifNode.elseStat.foreach(stat =>
       instructions ++= compileStat(stat)(
         state,
@@ -1206,7 +1061,6 @@ object CodeGenerator {
         labels
       )
     )
-    // instructions ++= StackMachine.removeStackFrame()
 
     instructions.addAll(
       List(
@@ -1216,7 +1070,6 @@ object CodeGenerator {
     )
 
     // Compile then statement
-    // instructions ++= StackMachine.addStackFrame(ifNode.thenSymbolTable)
     ifNode.thenStat.foreach(stat =>
       instructions ++= compileStat(stat)(
         state,
@@ -1226,7 +1079,6 @@ object CodeGenerator {
         labels
       )
     )
-    // instructions ++= StackMachine.removeStackFrame()
 
     instructions += Label(endLabel)
 
@@ -1243,9 +1095,7 @@ object CodeGenerator {
 
   def compileIdent(ident: Ident, resReg: Register)(implicit
       state: CodeGenState,
-      // printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type]
-      // labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
     state.identToReg.get(ident) match {
@@ -1285,14 +1135,72 @@ object CodeGenerator {
     instructions
   }
 
-  def storeRes(offset: Int, size: Int, resReg: Register): Instruction = {
+  private def genPrint(expr: Expr, println: Boolean = false)(implicit
+      state: CodeGenState,
+      printTable: Map[(Int, Int), Type],
+      symbolTable: Map[Ident, Type],
+      functionTable: Map[Ident, (Type, List[Type])],
+      labels: Labels
+  ): mutable.ListBuffer[Instruction] = {
+    val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
+
+    val exprType: Option[Type] = expr match {
+      case ident: Ident => {
+        symbolTable.get(ident) match {
+          case Some(ty) => Some(ty)
+          case None     => printTable.get(expr.pos)
+        }
+      }
+      case _ => {
+        printTable.get(expr.pos)
+      }
+    }
+
+    instructions ++= compileExpr(expr, state.tmp)
+    instructions += Push(List(R0, R1, R2, R3))
+    instructions += Move(R0, state.tmp)
+    exprType match {
+      case Some(IntType()) =>
+        if (!Utils.printIntFlag)
+          Utils.printIntFlag = true
+        instructions += BranchAndLink("_printi")
+      case Some(CharType()) =>
+        if (!Utils.printCharFlag)
+          Utils.printCharFlag = true
+        instructions += BranchAndLink("_printc")
+      case Some(StringType()) | Some(ArrayType(CharType())) =>
+        if (!Utils.printStringFlag)
+          Utils.printStringFlag = true
+        instructions += BranchAndLink("_prints")
+      case Some(BoolType()) =>
+        if (!Utils.printBoolFlag)
+          Utils.printBoolFlag = true
+        instructions += BranchAndLink("_printb")
+      case _ =>
+        if (!Utils.printPFlag)
+          Utils.printPFlag = true
+        instructions += BranchAndLink("_printp")
+    }
+    if (println) {
+      if (!Utils.printlnFlag)
+        Utils.printlnFlag = true
+      instructions += BranchAndLink("_println")
+    }
+    instructions += Pop(List(R0, R1, R2, R3))
+  }
+
+  private def storeRes(
+      offset: Int,
+      size: Int,
+      resReg: Register
+  ): Instruction = {
     size match {
       case 1 => StoreByte(resReg, OffsetMode(FP, shiftAmount = ImmVal(offset)))
       case _ => Store(resReg, OffsetMode(FP, shiftAmount = ImmVal(offset)))
     }
   }
 
-  def getLValueSize(
+  private def getLValueSize(
       lValue: LValue
   )(implicit symbolTable: Map[Ident, Type]): Int = {
     lValue match {

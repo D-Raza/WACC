@@ -74,10 +74,6 @@ object StackMachine {
       instructions += Pop(List(FP))
     }
 
-    // if (stackFrameList.length != 0) {
-    //   instructions ++= List(Pop(List(FP, LR)))
-    // }
-
     instructions
   }
 
@@ -146,11 +142,6 @@ class StackFrame(symbolTable: Map[Ident, Type], paramList: List[Param]) {
       map += (param.ident -> offset)
       offset += param.ty.size
     }
-
-    // for ((ident, ty) <- symbolTable) {
-    //   map += (ident -> offset)
-    //   offset += ty.size
-    // }
 
     map
   }
