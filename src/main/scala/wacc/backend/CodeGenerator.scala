@@ -45,8 +45,8 @@ object CodeGenerator {
       funcInstructions ++= compileFunc(func)(state, programNode.functionTable)
     })
     
-    Utils.addUtils()(instructions)
     instructions ++= funcInstructions
+    Utils.addUtils()(instructions)
 
     mainLabels.addLabelInstructions(instructions)
     instructions
@@ -404,8 +404,8 @@ object CodeGenerator {
       case ifStatNode @ If(_, _, _) =>
         instructions ++= compileIfStat(
           ifStatNode,
-          state.getReg
-        ) // (ifStatNode, state.tmp)
+          state.tmp3
+        )
 
       case whileNode @ While(cond, bodyStat) => {
         val uniqueWhileName = "while_" + state.getNewLabelId;
@@ -433,7 +433,7 @@ object CodeGenerator {
           )
         )
 
-        val condReg = state.getReg
+        val condReg = state.tmp3
 
         instructions += Label(condLabel)
         instructions ++= compileExpr(cond, condReg)
@@ -745,7 +745,6 @@ object CodeGenerator {
     // move resreg r0 (handled by assign)
  
     instructions += Push(List(R0, R1, R2, R3))
-    instructions += Comment("Pushing arguments onto stack")
  
     instructions ++= StackMachine.addStackFrame(symbolTable)
  

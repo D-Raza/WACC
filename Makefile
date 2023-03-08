@@ -1,4 +1,4 @@
-milestone := "wacc_examples/valid/function/nested_functions"
+milestone := "wacc_examples/valid/function/nested_functions/"
 all: build
 
 lint:
