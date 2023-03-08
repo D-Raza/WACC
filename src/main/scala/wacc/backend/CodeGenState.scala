@@ -55,7 +55,7 @@ case class CodeGenState() {
   val tmp2: Register = R9
   val tmp3: Register = IP
 
-  var exitLabel: String = "main_exit"
+  var funcLabel: String = "main"
 
   val identToReg: mutable.Map[Ident, Register] = mutable.Map.empty
 

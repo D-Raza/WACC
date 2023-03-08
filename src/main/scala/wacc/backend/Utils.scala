@@ -325,6 +325,7 @@ object Utils {
     instructions.addAll(
       List(
         Directive("data"),
+        Directive("text"),
         Label("_freepair"),
         Push(List(LR)),
         Move(R8, R0),

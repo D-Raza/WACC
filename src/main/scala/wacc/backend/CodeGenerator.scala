@@ -42,7 +42,7 @@ object CodeGenerator {
     val funcInstructions = mutable.ListBuffer.empty[Instruction]
     
     programNode.funcs.foreach(func => {
-      funcInstructions ++= compileFunc(func)(state, programNode.functionTable)
+      funcInstructions ++= compileFunc(func)(new CodeGenState, programNode.functionTable)
     })
     
     instructions ++= funcInstructions
@@ -70,7 +70,7 @@ object CodeGenerator {
       Move(FP, SP)
     )
 
-    state.exitLabel = funcNameLabel + "_exit"
+    state.funcLabel = funcNameLabel
     StackMachine.addStackFrame(funcNode.symbolTable, funcNode.paramList, true)
     val funcLabels = new Labels(funcNode.ident.name)
     instructions ++= compileStats(funcNode.stats)(state, funcNode.printTable, funcNode.symbolTable, functionTable, funcLabels)
@@ -78,7 +78,7 @@ object CodeGenerator {
     StackMachine.removeStackFrame(true)
 
     instructions ++= List(
-      Label(state.exitLabel),
+      Label(state.funcLabel + "_exit"),
       Move(SP, FP), 
       Pop(List(R4, R5, R6, R7)),
       Pop(List(FP, PC)),
@@ -294,7 +294,7 @@ object CodeGenerator {
       case Return(expr) => {
         instructions ++= compileExpr(expr, state.tmp)
         instructions += Move(R0, state.tmp)
-        instructions += BranchAndLink(state.exitLabel)
+        instructions += BranchAndLink(state.funcLabel + "_exit")
       }
       case Exit(expr) => {
         instructions ++= compileExpr(expr, state.tmp)
@@ -408,7 +408,7 @@ object CodeGenerator {
         )
 
       case whileNode @ While(cond, bodyStat) => {
-        val uniqueWhileName = "while_" + state.getNewLabelId;
+        val uniqueWhileName = state.funcLabel + "while_" + state.getNewLabelId;
         val condLabel = uniqueWhileName + "_cond"
         val bodyLabel = uniqueWhileName + "_body"
         
@@ -1162,8 +1162,8 @@ object CodeGenerator {
     // Compile condition
     instructions ++= compileExpr(ifNode.cond, condReg)
 
-    val thenLabel = "l_" + state.getNewLabelId
-    val endLabel = "l_" + state.getNewLabelId
+    val thenLabel = "l_" + state.funcLabel + "_" + state.getNewLabelId
+    val endLabel = "l_" + state.funcLabel + "_" + state.getNewLabelId
 
     instructions.addAll(
       List(
