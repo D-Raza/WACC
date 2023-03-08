@@ -27,10 +27,11 @@ object StackMachine {
     val stackFrameToAdd = new StackFrame(symbolTable, paramList)
 
     if (isFun)
-      stackFrameToAdd.currVarOffset = -24 // FP, LR, R4, R5, R6, R7 pushed on stack at start
+      stackFrameToAdd.currVarOffset =
+        -24 // FP, LR, R4, R5, R6, R7 pushed on stack at start
 
     stackFrameList += stackFrameToAdd
-    
+
     if (!isFun && stackFrameList.length == 1) {
       instructions.addAll(
         List(
@@ -40,12 +41,12 @@ object StackMachine {
         )
       )
     } else {
-        instructions ++= (
+      instructions ++= (
         List(
           Push(List(FP)),
           Move(FP, SP)
-          )
         )
+      )
     }
 
     instructions.addAll(assignStackSpace(stackFrameToAdd.currVarOffset))
@@ -61,7 +62,8 @@ object StackMachine {
     val stackFrameToRemove = stackFrameList.remove(stackFrameList.length - 1)
 
     instructions.addAll(
-      if (!isFun) unassignStackSpace(stackFrameToRemove.currVarOffset) else List()
+      if (!isFun) unassignStackSpace(stackFrameToRemove.currVarOffset)
+      else List()
     )
     if (stackFrameList.length == 0) {
       instructions ++= List(
@@ -137,7 +139,7 @@ object StackMachine {
 class StackFrame(symbolTable: Map[Ident, Type], paramList: List[Param]) {
   var declaredVarMap: Map[Ident, Int] = {
     var map: Map[Ident, Int] = Map.empty
-    
+
     // the first four arguments are passed in R0-R3, the rest on the stack
     var offset = 0
     for (param <- paramList.drop(4)) {

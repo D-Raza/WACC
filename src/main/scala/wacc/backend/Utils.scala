@@ -461,7 +461,7 @@ object Utils {
     )
   }
 
-	// _arrLoadB:
+  // _arrLoadB:
   // @ Special calling convention: array ptr passed in R3, index in R10, LR (R14) is used as general register, and return into R3
   // push {lr}
   // cmp r10, #0

@@ -12,7 +12,6 @@ class Labels(var fname: String = "") {
       instructions: mutable.ListBuffer[Instruction]
   ): Unit = {
 
-    
     if (fname == "main") {
       Directive("global main") +=: instructions
       Label(fname) +=: instructions
