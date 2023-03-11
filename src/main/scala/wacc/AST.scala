@@ -162,17 +162,17 @@ object AST {
       case CharType() | BoolType() => 1
       case _                       => 4
     }
-    def eraseInnerTypes: PairElemType
+    // def eraseInnerTypes: PairElemType
 
   }
 
-  sealed trait PairElemType extends WACCType {
-    def asType: Type
-  }
+  // sealed trait PairElemType extends WACCType {
+  //   def asType: Type
+  // }
 
-  sealed trait GenericType extends Type with PairElemType {
+  sealed trait GenericType extends Type {
     def asType: Type = this
-    def eraseInnerTypes: PairElemType = this
+    // def eraseInnerTypes: PairElemType = this
   }
 
   // Base Types
@@ -299,26 +299,21 @@ object AST {
   }
 
   // Pair Types
-  case class PairType(fstType: PairElemType, sndType: PairElemType)(
+  case class PairType(fstType: Type, sndType: Type)(
       val pos: (Int, Int)
   ) extends Type {
-    def eraseInnerTypes: PairElemType = InnerPairType()(pos)
+    // def eraseInnerTypes: PairElemType = InnerPairType()(pos)
     def positioned(pos: (Int, Int)): PairType = PairType(fstType, sndType)(pos)
-    override def toString(): String = if (
-      (fstType equiv UnknownType()(NULLPOS)) && (sndType equiv UnknownType()(
-        NULLPOS
-      ))
-    ) "pair"
-    else s"pair($fstType, $sndType)"
+    override def toString(): String = s"pair($fstType, $sndType)"
     override def size: Int = 4
   }
 
-  case class InnerPairType()(val pos: (Int, Int)) extends PairElemType {
-    def asType: Type =
-      PairType(UnknownType()(NULLPOS), UnknownType()(NULLPOS))(pos)
-    def positioned(pos: (Int, Int)): InnerPairType = InnerPairType()(pos)
-    override def toString(): String = "pair"
-  }
+  // case class InnerPairType()(val pos: (Int, Int)) extends PairElemType {
+  //   def asType: Type =
+  //     PairType(UnknownType()(NULLPOS), UnknownType()(NULLPOS))(pos)
+  //   def positioned(pos: (Int, Int)): InnerPairType = InnerPairType()(pos)
+  //   override def toString(): String = "pair"
+  // }
 
   // Literals
   case class IntegerLiter(x: Int)(val pos: (Int, Int)) extends Expr
@@ -395,8 +390,8 @@ object AST {
   object BoolType extends ParserBridgePos0[BoolType]
   object CharType extends ParserBridgePos0[CharType]
   object StringType extends ParserBridgePos0[StringType]
-  object PairType extends ParserBridgePos2[PairElemType, PairElemType, PairType]
-  object InnerPairType extends ParserBridgePos0[InnerPairType]
+  object PairType extends ParserBridgePos2[Type, Type, PairType]
+  // object InnerPairType extends ParserBridgePos0[InnerPairType]
 
   // Literals
   object IntegerLiter extends ParserBridgePos1[Int, IntegerLiter]

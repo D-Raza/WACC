@@ -1,4 +1,4 @@
-milestone := "wacc_examples/valid/!(advanced)"
+milestone := "wacc_ext_examples/fullpairtypes"
 all: build
 
 lint:
