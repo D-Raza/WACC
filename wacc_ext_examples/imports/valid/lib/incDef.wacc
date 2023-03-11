@@ -1,0 +1,13 @@
+# this simply defines a function as part of a fictional library, should compile fine
+
+# Exit:
+# 0
+
+# Program:
+
+begin 
+    int inc(int x) is
+        return x + 1
+    end
+    skip
+end 

@@ -4,10 +4,19 @@ import wacc.AST._
 import wacc.backend.Globals.{WORD_SIZE, PAIR_SIZE}
 import wacc.backend.Utils
 import scala.collection.mutable
+import java.util.concurrent.Executors
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Await
+import scala.concurrent.duration._
 
 object CodeGenerator {
+
+  implicit val stackMachine: StackMachine = new StackMachine()
+
   def compileProgram(
-      programNode: Program
+      programNode: Program,
+      parallel: Boolean = false
   )(implicit state: CodeGenState): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
@@ -16,8 +25,10 @@ object CodeGenerator {
     implicit val functionTable: Map[Ident, (Type, List[Type])] =
       programNode.functionTable
     implicit val mainLabels = new Labels("main")
+    implicit val ec =
+      ExecutionContext.fromExecutor(Executors.newFixedThreadPool(6))
 
-    instructions ++= StackMachine.addStackFrame(programNode.symbolTable)
+    instructions ++= stackMachine.addStackFrame(programNode.symbolTable)
 
     instructions ++= compileStats(programNode.stat)
 
@@ -33,20 +44,39 @@ object CodeGenerator {
 
     instructions += Move(R0, ImmVal(0))
 
-    instructions ++= StackMachine.removeStackFrame()
+    instructions ++= stackMachine.removeStackFrame()
 
     instructions += Pop(List(PC))
 
-    val funcInstructions = mutable.ListBuffer.empty[Instruction]
+    if (parallel) {
+      val tasks: Seq[Future[mutable.ListBuffer[Instruction]]] =
+        for (func <- programNode.funcs) yield Future {
+          compileFunc(func)(
+            new CodeGenState,
+            programNode.functionTable
+          )
+        }
+      val aggregated: Future[Seq[mutable.ListBuffer[Instruction]]] =
+        Future.sequence(tasks)
 
-    programNode.funcs.foreach(func => {
-      funcInstructions ++= compileFunc(func)(
-        new CodeGenState,
-        programNode.functionTable
+      val compiledFuncs: Seq[mutable.ListBuffer[Instruction]] =
+        Await.result(aggregated, 10.seconds)
+      compiledFuncs.foreach(funcInstructions =>
+        instructions ++= funcInstructions
       )
-    })
+    } else {
+      val funcInstructions = mutable.ListBuffer.empty[Instruction]
 
-    instructions ++= funcInstructions
+      programNode.funcs.foreach(func => {
+        funcInstructions ++= compileFunc(func)(
+          new CodeGenState,
+          programNode.functionTable
+        )
+      })
+
+      instructions ++= funcInstructions
+    }
+
     Utils.addUtils()(instructions)
 
     mainLabels.addLabelInstructions(instructions)
@@ -74,17 +104,20 @@ object CodeGenerator {
     )
 
     state.funcLabel = funcNameLabel
-    StackMachine.addStackFrame(funcNode.symbolTable, funcNode.paramList, true)
+
+    val sm = new StackMachine()
+    sm.addStackFrame(funcNode.symbolTable, funcNode.paramList, true)
     val funcLabels = new Labels(funcNode.ident.name)
     instructions ++= compileStats(funcNode.stats)(
       state,
+      sm,
       funcNode.printTable,
       funcNode.symbolTable,
       functionTable,
       funcLabels
     )
     funcLabels.addLabelInstructions(instructions)
-    StackMachine.removeStackFrame(true)
+    sm.removeStackFrame(true)
 
     instructions ++= List(
       Label(state.funcLabel + "_exit"),
@@ -99,6 +132,7 @@ object CodeGenerator {
 
   def compileStats(stats: List[Stat], func: Boolean = false)(implicit
       state: CodeGenState,
+      stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
       functionTable: Map[Ident, (Type, List[Type])],
@@ -121,6 +155,7 @@ object CodeGenerator {
 
   def compileStat(stat: Stat)(implicit
       state: CodeGenState,
+      stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
       functionTable: Map[Ident, (Type, List[Type])],
@@ -134,9 +169,9 @@ object CodeGenerator {
         if (state.identToReg.contains(ident)) {
           state.identToReg -= ident
         } else if (
-          StackMachine.stackFrameList.last.declaredVarMap.contains(ident)
+          stackMachine.stackFrameList.last.declaredVarMap.contains(ident)
         ) {
-          StackMachine.stackFrameList.last.declaredVarMap -= ident
+          stackMachine.stackFrameList.last.declaredVarMap -= ident
         }
 
         state.getRegOrNone match {
@@ -145,11 +180,11 @@ object CodeGenerator {
             state.identToReg += (ident -> scratchReg)
           }
           case None => {
-            val offset = StackMachine.addDeclaration(ident, ty.size)
+            val offset = stackMachine.addDeclaration(ident, ty.size)
             instructions ++= compileRValue(rValue, state.tmp)
             instructions += PendingStackOffset(
               storeRes(offset, ty.size, state.tmp),
-              StackMachine.stackFrameList.last
+              stackMachine.stackFrameList.last
             )
           }
         }
@@ -179,10 +214,10 @@ object CodeGenerator {
                 instructions += Move(reg, state.tmp)
               }
               case None => {
-                val offset = StackMachine.getIdentOffset(ident)
+                val offset = stackMachine.getIdentOffset(ident)
                 instructions += PendingStackOffset(
                   storeRes(offset, ident.size, state.tmp),
-                  StackMachine.stackFrameList.last
+                  stackMachine.stackFrameList.last
                 )
               }
             }
@@ -229,10 +264,10 @@ object CodeGenerator {
                 instructions += Move(reg, R0)
               }
               case None => {
-                val offset = StackMachine.getIdentOffset(ident)
+                val offset = stackMachine.getIdentOffset(ident)
                 instructions += PendingStackOffset(
                   storeRes(offset, ident.size, R0),
-                  StackMachine.stackFrameList.last
+                  stackMachine.stackFrameList.last
                 )
               }
             }
@@ -302,7 +337,7 @@ object CodeGenerator {
         val oldIdentToReg: mutable.Map[Ident, Register] = mutable.Map.empty
         oldIdentToReg ++= state.identToReg
         val oldDeclaredVars: Map[Ident, Int] =
-          StackMachine.stackFrameList.last.declaredVarMap
+          stackMachine.stackFrameList.last.declaredVarMap
 
         instructions += Branch(condLabel)
 
@@ -311,6 +346,7 @@ object CodeGenerator {
         bodyStat.foreach(stat =>
           instructions ++= compileStat(stat)(
             state,
+            stackMachine,
             printTable,
             whileNode.symbolTable,
             functionTable,
@@ -335,7 +371,7 @@ object CodeGenerator {
         oldIdentToReg.foreach { case (id, reg) =>
           state.identToReg += (id -> reg)
         }
-        StackMachine.stackFrameList.last.declaredVarMap = oldDeclaredVars
+        stackMachine.stackFrameList.last.declaredVarMap = oldDeclaredVars
       }
 
       case scopeNode @ Scope(stats) => {
@@ -344,24 +380,25 @@ object CodeGenerator {
         val oldIdentToReg: mutable.Map[Ident, Register] = mutable.Map.empty
         oldIdentToReg ++= state.identToReg
         val oldDeclaredVars: Map[Ident, Int] =
-          StackMachine.stackFrameList.last.declaredVarMap
+          stackMachine.stackFrameList.last.declaredVarMap
 
-        instructions ++= StackMachine.addStackFrame(scopeNode.symbolTable)
+        instructions ++= stackMachine.addStackFrame(scopeNode.symbolTable)
         instructions ++= compileStats(stats)(
           state,
+          stackMachine,
           printTable,
           scopeNode.symbolTable,
           functionTable,
           labels
         )
-        instructions ++= StackMachine.removeStackFrame()
+        instructions ++= stackMachine.removeStackFrame()
 
         state.availableRegs = oldAvailableRegs
         state.identToReg.clear()
         oldIdentToReg.foreach { case (id, reg) =>
           state.identToReg += (id -> reg)
         }
-        StackMachine.stackFrameList.last.declaredVarMap = oldDeclaredVars
+        stackMachine.stackFrameList.last.declaredVarMap = oldDeclaredVars
       }
     }
     instructions
@@ -369,6 +406,7 @@ object CodeGenerator {
 
   def compileRValue(rValue: RValue, resReg: Register)(implicit
       state: CodeGenState,
+      stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
       functionTable: Map[Ident, (Type, List[Type])],
@@ -430,6 +468,7 @@ object CodeGenerator {
       unpack: Boolean = false
   )(implicit
       state: CodeGenState,
+      stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
       functionTable: Map[Ident, (Type, List[Type])],
@@ -499,6 +538,7 @@ object CodeGenerator {
       load: Boolean = false
   )(implicit
       state: CodeGenState,
+      stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
       functionTable: Map[Ident, (Type, List[Type])],
@@ -521,7 +561,7 @@ object CodeGenerator {
           case None =>
             instructions += Move(
               R3,
-              ImmVal(StackMachine.getIdentOffset(ident))
+              ImmVal(stackMachine.getIdentOffset(ident))
             )
         }
 
@@ -556,6 +596,7 @@ object CodeGenerator {
 
   def compileNewPair(expr1: Expr, expr2: Expr, resReg: Register)(implicit
       state: CodeGenState,
+      stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
       functionTable: Map[Ident, (Type, List[Type])],
@@ -606,6 +647,7 @@ object CodeGenerator {
 
   def compileFunctionCall(funcCallNode: Call, resReg: Register)(implicit
       state: CodeGenState,
+      stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
       functionTable: Map[Ident, (Type, List[Type])],
@@ -621,7 +663,7 @@ object CodeGenerator {
 
     instructions += Push(List(R0, R1, R2, R3))
 
-    instructions ++= StackMachine.addStackFrame(symbolTable)
+    instructions ++= stackMachine.addStackFrame(symbolTable)
 
     val regs = mutable.Stack(R0, R1, R2, R3)
     val regsLength = regs.length
@@ -661,13 +703,14 @@ object CodeGenerator {
       instructions += AddInstr(SP, SP, ImmVal(argShift))
     }
 
-    instructions ++= StackMachine.removeStackFrame(true)
+    instructions ++= stackMachine.removeStackFrame(true)
     instructions += Pop(List(R0, R1, R2, R3))
 
   }
 
   def compileExpr(expr: Expr, resReg: Register)(implicit
       state: CodeGenState,
+      stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
       functionTable: Map[Ident, (Type, List[Type])],
@@ -952,10 +995,10 @@ object CodeGenerator {
                         OffsetMode(
                           FP,
                           shiftAmount =
-                            ImmVal(StackMachine.getIdentOffset(ident))
+                            ImmVal(stackMachine.getIdentOffset(ident))
                         )
                       ),
-                      StackMachine.stackFrameList.last
+                      stackMachine.stackFrameList.last
                     )
                   case _ =>
                     instructions += PendingStackOffset(
@@ -964,10 +1007,10 @@ object CodeGenerator {
                         OffsetMode(
                           FP,
                           shiftAmount =
-                            ImmVal(StackMachine.getIdentOffset(ident))
+                            ImmVal(stackMachine.getIdentOffset(ident))
                         )
                       ),
-                      StackMachine.stackFrameList.last
+                      stackMachine.stackFrameList.last
                     )
                 }
 
@@ -1021,6 +1064,7 @@ object CodeGenerator {
 
   def compileIfStat(ifNode: If, resReg: Register)(implicit
       state: CodeGenState,
+      stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
       functionTable: Map[Ident, (Type, List[Type])],
@@ -1032,7 +1076,7 @@ object CodeGenerator {
     val oldIdentToReg: mutable.Map[Ident, Register] = mutable.Map.empty
     oldIdentToReg ++= state.identToReg
     val oldDeclaredVars: Map[Ident, Int] =
-      StackMachine.stackFrameList.last.declaredVarMap
+      stackMachine.stackFrameList.last.declaredVarMap
 
     oldIdentToReg ++= state.identToReg
 
@@ -1055,6 +1099,7 @@ object CodeGenerator {
     ifNode.elseStat.foreach(stat =>
       instructions ++= compileStat(stat)(
         state,
+        stackMachine,
         printTable,
         ifNode.elseSymbolTable,
         functionTable,
@@ -1073,6 +1118,7 @@ object CodeGenerator {
     ifNode.thenStat.foreach(stat =>
       instructions ++= compileStat(stat)(
         state,
+        stackMachine,
         printTable,
         ifNode.thenSymbolTable,
         functionTable,
@@ -1087,7 +1133,7 @@ object CodeGenerator {
     oldIdentToReg.foreach { case (id, reg) =>
       state.identToReg += (id -> reg)
     }
-    StackMachine.stackFrameList.last.declaredVarMap = oldDeclaredVars
+    stackMachine.stackFrameList.last.declaredVarMap = oldDeclaredVars
 
     instructions
 
@@ -1095,6 +1141,7 @@ object CodeGenerator {
 
   def compileIdent(ident: Ident, resReg: Register)(implicit
       state: CodeGenState,
+      stackMachine: StackMachine,
       symbolTable: Map[Ident, Type]
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -1111,10 +1158,10 @@ object CodeGenerator {
                 resReg,
                 OffsetMode(
                   FP,
-                  shiftAmount = ImmVal(StackMachine.getIdentOffset(ident))
+                  shiftAmount = ImmVal(stackMachine.getIdentOffset(ident))
                 )
               ),
-              StackMachine.stackFrameList.last
+              stackMachine.stackFrameList.last
             )
           }
           case _ => {
@@ -1123,10 +1170,10 @@ object CodeGenerator {
                 resReg,
                 OffsetMode(
                   FP,
-                  shiftAmount = ImmVal(StackMachine.getIdentOffset(ident))
+                  shiftAmount = ImmVal(stackMachine.getIdentOffset(ident))
                 )
               ),
-              StackMachine.stackFrameList.last
+              stackMachine.stackFrameList.last
             )
           }
 
@@ -1137,6 +1184,7 @@ object CodeGenerator {
 
   private def genPrint(expr: Expr, println: Boolean = false)(implicit
       state: CodeGenState,
+      stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
       functionTable: Map[Ident, (Type, List[Type])],
@@ -1202,13 +1250,13 @@ object CodeGenerator {
 
   private def getLValueSize(
       lValue: LValue
-  )(implicit symbolTable: Map[Ident, Type]): Int = {
+  )(implicit symbolTable: Map[Ident, Type], stackMachine: StackMachine): Int = {
     lValue match {
       case id: Ident => {
         symbolTable.get(id) match {
           case Some(t) => t.size
           case None => {
-            StackMachine.getIdentOffset(id)
+            stackMachine.getIdentOffset(id)
           }
         }
       }

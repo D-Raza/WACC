@@ -1,0 +1,15 @@
+# a source file that is part of a cycle of imports should not be compilable
+
+# Output:
+# #import_error#
+
+# Exit:
+# 150
+
+# Program:
+
+import "crossFileCircularDep1.wacc"
+
+begin
+    skip
+end

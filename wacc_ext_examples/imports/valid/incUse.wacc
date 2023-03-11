@@ -1,0 +1,20 @@
+# this program uses a library function defined elsewhere
+
+# Input: 69
+
+# Output:
+# enter a number to increment:
+# 70
+#
+
+# Program:
+
+import "lib/incDef.wacc"
+
+begin
+    int x = 0;
+    println "enter a number to increment:";
+    read x;
+    x = call inc(x);
+    println x
+end

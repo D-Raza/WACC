@@ -1,7 +1,7 @@
 package wacc.frontend
 
 import parsley.Parsley._
-import parsley.combinator.{sepBy, sepBy1, some}
+import parsley.combinator.{sepBy, sepBy1, some, many}
 import parsley.errors.combinator._
 import parsley.expr._
 import parsley.io.ParseFromIO
@@ -18,6 +18,13 @@ object Parser {
   // Utilise our custom error builder
   implicit val waccErrorBuilder: WACCErrorBuilder =
     new WACCErrorBuilder
+
+  private lazy val `<source-file>` = fully(
+    SourceFile(many(`<import>`), `<program>`)
+  )
+
+  /* <import> ::= "import" <string-literal> */
+  private lazy val `<import>` = Import("import" *> STRING)
 
   /* <program> ::= "begin" (<func>)* <stat> (";" <stat>)* "end" */
   private lazy val `<program>` = fully(
@@ -202,7 +209,7 @@ object Parser {
     * @return
     *   the parsed program
     */
-  def parse(input: File): Result[WACCError, Program] =
-    `<program>`.parseFromFile(input).get
+  def parse(input: File): Result[WACCError, SourceFile] =
+    `<source-file>`.parseFromFile(input).get
 
 }

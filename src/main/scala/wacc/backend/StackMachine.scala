@@ -3,7 +3,7 @@ package wacc.backend
 import scala.collection.mutable
 import wacc.AST.{Param, Ident, Type}
 
-object StackMachine {
+class StackMachine {
   val stackFrameList: mutable.ListBuffer[StackFrame] = mutable.ListBuffer.empty
   def currStackSize =
     if (stackFrameList.nonEmpty) stackFrameList.last.currVarOffset else 0
