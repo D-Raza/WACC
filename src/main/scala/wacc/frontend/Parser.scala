@@ -97,7 +97,7 @@ object Parser {
   // <arg-list> ::= <expr> (‘,’ <expr>)*
   private lazy val `<arg-list>` = sepBy(`<expr>`, ",")
   // <type> ::= <base-type> | <array-type> | <pair-type>
-  private lazy val `<type>` = chain
+  private lazy val `<type>`: Parsley[Type] = chain
     .postfix(`<base-type>` <|> `<pair-type>`, `<array-type>`)
     .label("type")
     .explain(
@@ -114,13 +114,13 @@ object Parser {
   private lazy val `<array-type>` = ArrayType <# "[]".label("[] (array type)")
   // <pair-type> ::= ‘pair’ ‘(’ <pair-elem-type> ‘,’ <pair-elem-type> ‘)’
   private lazy val `<pair-type>` = PairType(
-    "pair" *> "(" *> `<pair-elem-type>` <* ",",
-    `<pair-elem-type>` <* ")"
+    "pair" *> "(" *> `<type>` <* ",",
+    `<type>` <* ")"
   )
   // <pair-elem-type> ::= <base-type> | <array-type> | "pair"
-  private lazy val `<pair-elem-type>` : Parsley[PairElemType] = attempt(
-    chain.postfix1(`<base-type>` <|> `<pair-type>`, `<array-type>`)
-  ) <|> `<base-type>` <|> (InnerPairType <# "pair")
+  // private lazy val `<pair-elem-type>` : Parsley[PairElemType] = attempt(
+  //   chain.postfix1(`<base-type>` <|> `<pair-type>`, `<array-type>`)
+  // ) <|> `<base-type>` <|> (InnerPairType <# "pair")
   private lazy val `<expr>` : Parsley[Expr] = precedence(
     SOps(InfixR)(Or <# "||".label("binary operator")) +:
       SOps(InfixR)(And <# "&&".label("binary operator")) +:
