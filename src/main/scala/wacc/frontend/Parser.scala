@@ -97,7 +97,7 @@ object Parser {
   // <arg-list> ::= <expr> (‘,’ <expr>)*
   private lazy val `<arg-list>` = sepBy(`<expr>`, ",")
   // <type> ::= <base-type> | <array-type> | <pair-type>
-  private lazy val `<type>`: Parsley[Type] = chain
+  private lazy val `<type>` : Parsley[Type] = chain
     .postfix(`<base-type>` <|> `<pair-type>`, `<array-type>`)
     .label("type")
     .explain(
