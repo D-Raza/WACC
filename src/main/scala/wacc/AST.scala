@@ -181,6 +181,12 @@ object AST {
   sealed trait PairLiter extends Expr
 
   /* Case Classes and Traits */
+  case class SourceFile(imports: List[Import], program: Program)(
+      val pos: (Int, Int)
+  )
+
+  case class Import(filepath: String)(val pos: (Int, Int))
+
   case class Program(funcs: List[Func], stat: List[Stat])(val pos: (Int, Int)) {
     var symbolTable: Map[Ident, Type] = Map.empty
     var printTable: Map[(Int, Int), Type] = Map.empty
@@ -351,6 +357,8 @@ object AST {
   case class Bracket(x: Expr)(val pos: (Int, Int)) extends Expr
 
   /* Companion Objects */
+  object SourceFile extends ParserBridgePos2[List[Import], Program, SourceFile]
+  object Import extends ParserBridgePos1[String, Import]
   object Program extends ParserBridgePos2[List[Func], List[Stat], Program]
   object Func
       extends ParserBridgePos4[Type, Ident, List[Param], List[Stat], Func]

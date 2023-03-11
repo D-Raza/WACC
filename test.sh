@@ -38,7 +38,6 @@ fi
 
 # Get the total number of test cases
 no_files=$(echo "$files" | wc -l)
-echo "no_files $no_files"
 if [ $no_files -eq 0 ]; then
     echo -e "\e[1;31m[ERROR] No test cases found in $dir.\e[0m"
     exit 1
@@ -50,7 +49,6 @@ if [[ $dir == "./"* ]]; then
 else
   basedir=$(dirname "./$dir" | cut -d "/" -f2)
 fi
-echo "basedir: $basedir"
 if ! basedir_files=$(find $basedir -type f -name "*.wacc"); then
     exit 1
 fi
@@ -81,13 +79,13 @@ test_task() {
     fi
     
     # Account for invalid exit codes
-    if [ "$expected_runtime_exit_code" -ne 100 ] && [ "$expected_runtime_exit_code" -ne 200 ]; then
+    if [ "$expected_runtime_exit_code" -ne 100 ] && [ "$expected_runtime_exit_code" -ne 200 ] && [ "$expected_runtime_exit_code" -ne 150 ]; then
         expected_compiler_exit_code=0
     else
         expected_compiler_exit_code=$expected_runtime_exit_code
     fi
     
-    compiler_output=$(./compile "$file")
+    compiler_output=$(./compile "$file" P)
     compiler_exit_code=$?
 
     if [ $expected_compiler_exit_code -eq $compiler_exit_code ]; then

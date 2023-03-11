@@ -1,4 +1,6 @@
-milestone := "wacc_ext_examples/fullpairtypes"
+# milestone := "wacc_examples/valid/!(pairs|advanced|runtimeErr)"
+milestone := "wacc_ext_examples"
+
 all: build
 
 lint:
