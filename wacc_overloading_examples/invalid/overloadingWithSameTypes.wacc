@@ -1,0 +1,19 @@
+# Attempting to overload a function with same types, but different arg names.
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  int f(int x, bool y) is
+    return 10
+  end
+  int f(int y, bool x) is
+    return 100
+  end 
+  int x = 10
+end

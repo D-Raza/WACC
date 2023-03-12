@@ -1,0 +1,20 @@
+# Calling the wrong function
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  int f(int x) is
+    return 10
+  end
+  int f(bool x) is
+    return 20 
+  end
+  int x = call f() ; 
+  println x
+end

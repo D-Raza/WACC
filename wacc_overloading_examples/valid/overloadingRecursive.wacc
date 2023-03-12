@@ -1,0 +1,37 @@
+# overloading function
+
+# Output:
+# 42
+# 25
+#
+
+# Program:
+
+begin
+  int rec(int x) is
+    if x == 0
+    then
+      skip
+    else
+      int y = call rec(x - 1)
+    fi ;
+    return 42
+  end
+
+  int rec(int x, int y) is
+    if x == y
+    then
+      skip
+    else
+      int z = call rec(x - 1, y)
+    fi ;
+    return 25
+  end
+
+  int x = 0 ;
+  x = call rec(8) ;
+  println x ; # should be 42
+  int y = 0 ;
+  y = call rec(8, 0) ;
+  println y # should be 25
+end
