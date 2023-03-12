@@ -20,7 +20,8 @@ object SemanticAnalyser {
       program: Program
   )(implicit source: File): List[WACCError] = {
     val errors: mutable.ListBuffer[WACCError] = mutable.ListBuffer.empty
-    val functionTableWithOverloading: mutable.Map[Ident, List[(Type, List[Type])]] = mutable.Map.empty 
+    val functionTableWithOverloading
+        : mutable.Map[Ident, List[(Type, List[Type])]] = mutable.Map.empty
     val localPrintTable = mutable.Map.empty[(Int, Int), Type]
     val localSymbolTable = mutable.Map.empty[Ident, Type]
 
@@ -28,16 +29,22 @@ object SemanticAnalyser {
       case Program(funcs, stats) =>
         funcs.foreach(func => {
           if (functionTableWithOverloading contains func.ident)
-            if (functionTableWithOverloading(func.ident).contains((func.ty, func.paramList.map(_.ty)))) {
+            if (
+              functionTableWithOverloading(func.ident)
+                .contains((func.ty, func.paramList.map(_.ty)))
+            ) {
               errors += RedefinedFunctionError.genError(func.ident)
-            }
-            else {
+            } else {
               // functionTableWithOverloading.updated(func.ident, functionTableWithOverloading(func.ident) ++ List((func.ty, func.paramList.map(_.ty))))
-              functionTableWithOverloading += (func.ident -> (functionTableWithOverloading(func.ident) ++ List((func.ty, func.paramList.map(_.ty)))))
+              functionTableWithOverloading += (func.ident -> (functionTableWithOverloading(
+                func.ident
+              ) ++ List((func.ty, func.paramList.map(_.ty)))))
             }
           else {
             // functionTableWithOverloading.updated(func.ident, List((func.ty, func.paramList.map(_.ty))))
-            functionTableWithOverloading += (func.ident -> List((func.ty, func.paramList.map(_.ty))))
+            functionTableWithOverloading += (func.ident -> List(
+              (func.ty, func.paramList.map(_.ty))
+            ))
           }
         })
         // implicit val funcTable: Map[Ident, (Type, List[Type])] =
@@ -495,7 +502,7 @@ object SemanticAnalyser {
                   argTypes.length,
                   paramTypes.length
                 )
-              
+
               argTypes.zip(paramTypes).zipWithIndex.foreach {
                 case ((argType, paramType), i) =>
                   if (!(argType equiv paramType))
@@ -507,10 +514,8 @@ object SemanticAnalyser {
                     )
               }
               (returnType, errors.toList, printTable.toMap)
-            }
-
-            else {
-                // map _.2 on l to get list of types 
+            } else {
+              // map _.2 on l to get list of types
               // zip with argTypes to get list of (List[Type], List[Type])
               // filter out ones where length is not equal, if 0 then incorrect number of args error
               // if not 0, go on to check if types are correct
@@ -520,19 +525,17 @@ object SemanticAnalyser {
                 errors += IncorrectNumberOfArgsError.genError(
                   f,
                   argLength,
-                  l.head._2.length, // placeholder for now
+                  l.head._2.length // placeholder for now
                 )
               }
 
               // filter out ones in paramsValidNumArgs where the types do not match with argTypes
-              // if 0 then type mismatch error 
+              // if 0 then type mismatch error
               val paramsValidTypes = paramsValidNumArgs.filter(
-                _.zip(argTypes).forall(
-                  x => x._1 equiv x._2
-                )
+                _.zip(argTypes).forall(x => x._1 equiv x._2)
               )
 
-              // if 0 then type mismatch error  
+              // if 0 then type mismatch error
               if (paramsValidTypes.length == 0 && argLength > 0) {
                 errors += TypeMismatchError.genError(
                   argTypes.head,
@@ -548,7 +551,6 @@ object SemanticAnalyser {
 
             }
 
-            
           case None =>
             (
               ErrorType()(c.pos),

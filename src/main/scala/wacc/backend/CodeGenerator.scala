@@ -53,19 +53,21 @@ object CodeGenerator {
     instructions
   }
 
-  
   private def funcLabel(funcIdent: Ident, argTypes: List[Type]): String = {
     val argTypesAsStr = argTypes match {
       case Nil => List("void") // should never happen
-      case _   => {
-        argTypes.map(argType  => argType match {
-          case arr: ArrayType => arr.labelToString() // array type uses different label string method
-          case _              => argType.toString
-        })
+      case _ => {
+        argTypes.map(argType =>
+          argType match {
+            case arr: ArrayType =>
+              arr.labelToString() // array type uses different label string method
+            case _ => argType.toString
+          }
+        )
       }
     }
     "wacc_" + funcIdent.name + "_" + argTypesAsStr.mkString("_")
-}
+  }
 
   def compileFunc(funcNode: Func)(implicit
       state: CodeGenState,
@@ -88,7 +90,7 @@ object CodeGenerator {
 
     state.funcLabel = funcNameLabel
     StackMachine.addStackFrame(funcNode.symbolTable, funcNode.paramList, true)
-    val funcLabels = new Labels(funcNameLabel) 
+    val funcLabels = new Labels(funcNameLabel)
     instructions ++= compileStats(funcNode.stats)(
       state,
       funcNode.printTable,

@@ -256,8 +256,8 @@ object AST {
 
   case class Call(x: Ident, args: List[Expr])(val pos: (Int, Int))
       extends RValue {
-        var argTypes: List[Type] = Nil
-      }
+    var argTypes: List[Type] = Nil
+  }
 
   case class AnyType()(val pos: (Int, Int)) extends GenericType {
     def positioned(pos: (Int, Int)): AnyType = AnyType()(pos)
