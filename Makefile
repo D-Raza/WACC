@@ -1,4 +1,4 @@
-milestone := "wacc_examples/valid/!(advanced)"
+milestone := "wacc_overloading_examples/"
 all: build
 
 lint:
