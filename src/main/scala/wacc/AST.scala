@@ -184,7 +184,7 @@ object AST {
   case class Program(funcs: List[Func], stat: List[Stat])(val pos: (Int, Int)) {
     var symbolTable: Map[Ident, Type] = Map.empty
     var printTable: Map[(Int, Int), Type] = Map.empty
-    var functionTable: Map[Ident, (Type, List[Type])] = Map.empty
+    var functionTable: Map[Ident, List[(Type, List[Type])]] = Map.empty
   }
 
   case class Func(
@@ -255,7 +255,9 @@ object AST {
   case class NewPair(fst: Expr, snd: Expr)(val pos: (Int, Int)) extends RValue
 
   case class Call(x: Ident, args: List[Expr])(val pos: (Int, Int))
-      extends RValue
+      extends RValue {
+        var argTypes: List[Type] = Nil
+      }
 
   case class AnyType()(val pos: (Int, Int)) extends GenericType {
     def positioned(pos: (Int, Int)): AnyType = AnyType()(pos)
@@ -296,10 +298,17 @@ object AST {
   case class ArrayType(ty: Type)(val pos: (Int, Int)) extends GenericType {
     def positioned(pos: (Int, Int)): ArrayType = ArrayType(ty)(pos)
     override def toString(): String = s"$ty[]"
+    def labelToString(): String = {
+      val tyToLabelStr = ty match {
+        case arr: ArrayType => arr.labelToString()
+        case _              => ty.toString()
+      }
+      "arrayOf" + tyToLabelStr
+    }
   }
 
   // Pair Types
-  case class PairType(fstType: PairElemType, sndType: PairElemType)(
+  case class PairType(fstType: PairElemType, sndType: PairElemType)( // my phone died lmao, gimme a sec
       val pos: (Int, Int)
   ) extends Type {
     def eraseInnerTypes: PairElemType = InnerPairType()(pos)
