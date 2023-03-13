@@ -484,6 +484,7 @@ object SemanticAnalyser {
           printTable.toMap ++ fstPrintTable ++ sndPrintTable
         )
       case c @ Call(f, args) =>
+        println(s"functable contains: ${functionTableWithOverloading get f}")
         functionTableWithOverloading get f match {
           case Some(l) =>
             val (argTypes, argErrors, argPrintTable) =
@@ -500,7 +501,7 @@ object SemanticAnalyser {
                 errors += IncorrectNumberOfArgsError.genError(
                   f,
                   argTypes.length,
-                  paramTypes.length
+                  Set(paramTypes.length)
                 )
 
               argTypes.zip(paramTypes).zipWithIndex.foreach {
@@ -515,39 +516,38 @@ object SemanticAnalyser {
               }
               (returnType, errors.toList, printTable.toMap)
             } else {
-              // map _.2 on l to get list of types
-              // zip with argTypes to get list of (List[Type], List[Type])
-              // filter out ones where length is not equal, if 0 then incorrect number of args error
-              // if not 0, go on to check if types are correct
-              val argLength = argTypes.length
-              val paramsValidNumArgs = l.map(_._2).filter(_.length == argLength)
-              if (paramsValidNumArgs.length == 0) {
+              // try to match the lengths of the argTypes and the paramTypes
+              val matchingArgNo = l.filter(_._2.length == argTypes.length)
+              if (matchingArgNo.length == 0) {
                 errors += IncorrectNumberOfArgsError.genError(
                   f,
-                  argLength,
-                  l.head._2.length // placeholder for now
+                  argTypes.length,
+                  l.map(_._2.length).toSet
                 )
+                (ErrorType()(NULLPOS), errors.toList, printTable.toMap)
+              } else {
+                // try to match the types of the argTypes and the paramTypes
+                // if one isn't matched, give a type mismatch error for that arg index
+                val matchingArgTypes = matchingArgNo.filter {
+                  case (_, paramTypes) =>
+                    argTypes.zip(paramTypes).forall {
+                      case (argType, paramType) => argType equiv paramType
+                    }
+                }
+
+                // if there is only one matching function, return the return type
+                // otherwise, return an error
+                if (matchingArgTypes.length == 1) {
+                  (matchingArgTypes.head._1, errors.toList, printTable.toMap)
+                } else {
+                  errors += AmbiguousFunctionCallError.genError(
+                    f,
+                    argTypes,
+                    matchingArgNo.map(_._2).toSet
+                  )
+                  (ErrorType()(NULLPOS), errors.toList, printTable.toMap)
+                }
               }
-
-              // filter out ones in paramsValidNumArgs where the types do not match with argTypes
-              // if 0 then type mismatch error
-              val paramsValidTypes = paramsValidNumArgs.filter(
-                _.zip(argTypes).forall(x => x._1 equiv x._2)
-              )
-
-              // if 0 then type mismatch error
-              if (paramsValidTypes.length == 0 && argLength > 0) {
-                errors += TypeMismatchError.genError(
-                  argTypes.head,
-                  paramsValidNumArgs.head.toSet,
-                  args.toIndexedSeq.head.pos,
-                  s"function call to $f, argument 0"
-                )
-              }
-
-              val returnType = l.head._1
-
-              (returnType, errors.toList, printTable.toMap)
 
             }
 

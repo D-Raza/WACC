@@ -1,0 +1,28 @@
+# overloading function 
+
+# Output:
+# 1
+# a
+# 
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  int head(int[] arr) is
+    return arr[0]
+  end
+  char head(char[] arr) is
+    return arr[0]
+  end
+  
+  int[] arr_i = [1,2,3,4,5] ;
+  int head_i = call head(arr_i) ;
+  println head_i;
+    
+  char[] arr_c = ['a','b','c','d','e'] ;
+  char head_c = call head(arr_c) ;
+  println head_c
+end

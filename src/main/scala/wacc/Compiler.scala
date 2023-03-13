@@ -108,7 +108,7 @@ object Compiler {
         implicit val source: File = inputFile
         var program = x.program
 
-        if (DEBUG) {
+        if (DEBUG && !x.imports.isEmpty) {
           println("Imports:")
           x.imports.foreach(println)
           println()
