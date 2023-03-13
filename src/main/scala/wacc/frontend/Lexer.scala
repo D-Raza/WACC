@@ -5,7 +5,7 @@ import parsley.Parsley._
 import parsley.character.digit
 import parsley.errors.combinator._
 import parsley.implicits.character.stringLift
-import parsley.token.descriptions.numeric.{ExponentDesc, NumericDesc}
+import parsley.token.descriptions.numeric.NumericDesc
 import parsley.token.descriptions.text.{EscapeDesc, TextDesc}
 import parsley.token.descriptions.{LexicalDesc, NameDesc, SpaceDesc, SymbolDesc}
 import parsley.token.{Lexer, predicate}
@@ -74,11 +74,7 @@ object Lexer {
       identifierLetter =
         predicate.Basic(c => Character.isLetterOrDigit(c) || c == '_')
     ),
-    numericDesc = NumericDesc.plain.copy(
-      integerNumbersCanBeHexadecimal = false,
-      integerNumbersCanBeOctal = false,
-      decimalExponentDesc = ExponentDesc.NoExponents
-    ),
+    numericDesc = NumericDesc.plain,
     textDesc = TextDesc.plain.copy(
       escapeSequences = EscapeDesc.plain.copy(
         escBegin = '\\',
@@ -113,7 +109,7 @@ object Lexer {
   val NEGATE: Parsley[Unit] =
     lexer.lexeme(attempt("-" *> notFollowedBy(digit))).hide
   val INTEGER: Parsley[Int] =
-    lexer.lexeme.numeric.integer.decimal32.label("integer literal")
+    lexer.lexeme.numeric.integer.number32.label("integer literal")
   val BOOL: Parsley[Boolean] =
     lexer
       .lexeme(attempt("true" #> true <|> "false" #> false))

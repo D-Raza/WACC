@@ -1,0 +1,12 @@
+# integer literals can now be octal
+
+# Output:
+# 12
+#
+
+# Program:
+
+begin
+    int x = 0o14;
+    println x
+end
