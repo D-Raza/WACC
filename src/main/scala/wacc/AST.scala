@@ -320,6 +320,17 @@ object AST {
     // def eraseInnerTypes: PairElemType = InnerPairType()(pos)
     def positioned(pos: (Int, Int)): PairType = PairType(fstType, sndType)(pos)
     override def toString(): String = s"pair($fstType, $sndType)"
+    def labelToString(): String = {
+      val fstToLabelStr = fstType match {
+        case arr: ArrayType => arr.labelToString()
+        case _              => fstType.toString()
+      }
+      val sndToLabelStr = sndType match {
+        case arr: ArrayType => arr.labelToString()
+        case _              => sndType.toString()
+      }
+      "pairOf" + fstToLabelStr + sndToLabelStr
+    }
     override def size: Int = 4
   }
 

@@ -91,6 +91,9 @@ object CodeGenerator {
           argType match {
             case arr: ArrayType =>
               arr.labelToString() // array type uses different label string method
+            case pair: PairType =>
+              pair
+                .labelToString() // pair type uses different label string method
             case _ => argType.toString
           }
         )
@@ -122,7 +125,7 @@ object CodeGenerator {
 
     val sm = new StackMachine()
     sm.addStackFrame(funcNode.symbolTable, funcNode.paramList, true)
-    val funcLabels = new Labels(funcNode.ident.name)
+    val funcLabels = new Labels(funcNameLabel)
     instructions ++= compileStats(funcNode.stats)(
       state,
       sm,

@@ -39,7 +39,7 @@ class OverloadingTests extends AnyFlatSpec {
       parseResult match {
         case Success(x) => {
           implicit val source: File = inputFile
-          val errors = checkProgramSemantics(x)
+          val errors = checkProgramSemantics(x.program)
           if (!errors.isEmpty)
             exitCode = 200
         }
@@ -66,13 +66,13 @@ class OverloadingTests extends AnyFlatSpec {
       val ast = parseResult.get
 
       // Check semantics 
-      val errors = checkProgramSemantics(ast)(inputFile)
+      val errors = checkProgramSemantics(ast.program)(inputFile)
       errors should be (Nil) 
 
       // Run the backend
       implicit val state = CodeGenState()
       implicit val instructions = mutable.ListBuffer[Instruction]()
-      instructions ++= CodeGenerator.compileProgram(ast)(state)
+      instructions ++= CodeGenerator.compileProgram(ast.program)(state)
 
       // Write the .s file
       val noExtension = file.split("\\.").head
