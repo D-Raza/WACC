@@ -140,7 +140,7 @@ object Compiler {
 
           val errors = checkProgramSemantics(program)
           if (errors.isEmpty) {
-            println("No errors found!")
+            println(s"No errors found in $inputFile!")
             (Some(program), 0)
           } else {
             println(s"Errors found in $inputFile:")

@@ -31,6 +31,7 @@ object Parser {
     "begin" *> (attempt(Program(pure(Nil), sepBy1(`<stat>`, ";"))) <|>
       Program(some(`<func>`), sepBy1(`<stat>`, ";"))) <* "end"
   )
+  
   // <func> ::= = <type> <ident> ‘(’ <param-list>? ‘)’ ‘is’ <stat> ‘end’
   private lazy val `<func>` = attempt(
     Func(

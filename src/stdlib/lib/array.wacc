@@ -1,0 +1,67 @@
+# ARRAY FUNCTIONS
+begin
+    # @note functions on pair arrays cannot be pre-written currently since we have full typing (requires notion of generics)
+
+    # These functions return the first element of an array.
+    # @param arr the array
+    # @return the first element of the array
+    int head(int[] arr) is
+        return arr[0]
+    end
+    bool head(bool[] arr) is
+        return arr[0]
+    end
+    char head(char[] arr) is
+        return arr[0]
+    end
+    string head(string[] arr) is
+        return arr[0]
+    end
+
+    # These functions return the last element of an array.
+    # @param arr the array
+    # @return the last element of the array
+    int last(int[] arr) is
+        return arr[len arr - 1]
+    end
+    bool last(bool[] arr) is
+        return arr[len arr - 1]
+    end
+    char last(char[] arr) is
+        return arr[len arr - 1]
+    end
+    string last(string[] arr) is
+        return arr[len arr - 1]
+    end
+
+    # These functions sum the elements of an array.
+    # @note for boolean arrays, this function returns the number of true elements in the array
+    # @param arr the array
+    # @return the sum of all the elements of the array
+    int sum(int[] arr) is
+        int sum = 0;
+        int arrLen = len arr;
+        int i = 0;
+        while (i < arrLen) do
+            sum = sum + arr[i];
+            i = i + 1
+        done;
+        return sum
+    end
+    int sum(bool[] arr) is
+        int sum = 0;
+        int arrLen = len arr;
+        int i = 0;
+        while (i < arrLen) do
+            if (arr[i]) then
+                sum = sum + 1
+            else
+                skip
+            fi;
+            i = i + 1
+        done;
+        return sum
+    end
+
+    skip
+end
