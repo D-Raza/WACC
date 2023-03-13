@@ -1,0 +1,14 @@
+# maximum of two zeroes should give zero
+
+# Output:
+# 0
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int max = call max(0, 0);
+    println max
+end

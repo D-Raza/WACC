@@ -1,0 +1,15 @@
+# any of an empty array is false
+
+# Output:
+# false
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int[] empty = [];
+    bool a = call any(empty);
+    println a
+end

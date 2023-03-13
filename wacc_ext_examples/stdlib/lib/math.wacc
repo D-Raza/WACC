@@ -1,0 +1,161 @@
+# MATH FUNCTIONS
+begin
+    # Computes the absolute value of a number.
+    # @param x the number
+    # @return the absolute value of x
+    int abs(int x) is
+        if (x < 0)
+        then
+            return -x
+        else
+            return x
+        fi
+    end
+
+    # Computes the power of a number.
+    # @param x the base
+    # @param n the exponent
+    # @return x^n
+    int pow(int x, int n) is
+        if (n == 0 || x == 1)
+        then
+            return 1
+        else 
+            int i = 1 ;
+            int res = x ;
+            while i < n do
+                res = res * x ;
+                i = i + 1
+            done ;
+            return res
+        fi 
+    end
+
+    # Computes the square of a number.
+    int square(int x) is
+        int x_squared = call pow(x, 2);
+        return x_squared
+    end
+
+    # Computes the cube of a number.
+    int cube(int x) is
+        int x_cubed = call pow(x, 3);
+        return x_cubed
+    end
+
+    # Computes the factorial of a number.
+    # @param n the number
+    # @return n!
+    int factorial(int n) is
+        if (n < 0) then
+            return -1
+        else
+            if (n == 0 || n == 1) then
+                return 1
+            else
+                int i = 1 ;
+                int ans = 1 ;
+                while (i != n) do
+                    i = i + 1 ;
+                    ans = ans * i 
+                done ;
+                return ans 
+            fi 
+        fi
+    end
+
+    # Computes the nth term of the Fibonacci sequence.
+    # @param n the term
+    # @return the nth term of the Fibonacci sequence
+    int fibonacci(int n) is
+        if (n < 0) then
+            return -1
+        else
+            if (n == 0) then
+                return 0
+            else
+                if (n == 1) then
+                    return 1
+                else
+                    int i = 1 ;
+                    int a = 0 ;
+                    int b = 1 ;
+                    int c = 0 ;
+                    while (i != n) do
+                        c = a + b ;
+                        a = b ;
+                        b = c ;
+                        i = i + 1
+                    done ;
+                    return c
+                fi
+            fi
+        fi
+    end
+
+    # Computes the greatest common divisor of two numbers.
+    # @param a the first number
+    # @param b the second number
+    # @return the greatest common divisor of a and b
+    int gcd(int a, int b) is
+        if (a == 0)
+        then
+            return b
+        else
+            int res = call gcd(b % a, a);
+            return res
+        fi
+    end
+
+    # Computes the least common multiple of two numbers.
+    # @param a the first number
+    # @param b the second number
+    # @return the least common multiple of a and b
+    int lcm(int a, int b) is
+        if (a == 0 && b == 0) then
+            return 0
+        else
+            int gcd = call gcd(a, b);
+            return (a * b) / gcd
+        fi
+    end
+
+    # Computes the largest of two numbers
+    # @param a the first number
+    # @param b the second number
+    # @return the largest of a and b
+    int max(int a, int b) is
+        if (a >= b) then
+            return a 
+        else 
+            return b 
+        fi 
+    end 
+
+    # Computes the smallest of two numbers
+    # @param a the first number
+    # @param b the second number
+    # @return the smallest of a and b
+    int min(int a, int b) is
+        if (a <= b) then
+            return a 
+        else 
+            return b 
+        fi 
+    end
+
+    # Computes the quotient and remainder of two numbers.
+    # @param p the dividend
+    # @param q the divisor
+    # @return a pair (quotient, remainder) of p and q
+    pair(int, int) divMod(int p, int q) is
+        int a = p / q ;
+        
+        int abs_p = call abs(p);
+        int b = abs_p % q ;  
+        pair(int, int) res = newpair(a, b) ;
+        return res
+    end
+
+    skip
+end

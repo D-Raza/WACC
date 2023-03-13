@@ -1,0 +1,15 @@
+# head of a string array returns correctly
+
+# Output:
+# This
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    string[] arr = ["This", "is", "a", "string", "array!"];
+    string h = call head(arr);
+    println h
+end

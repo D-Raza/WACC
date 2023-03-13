@@ -1,0 +1,14 @@
+# maximum of two integers should work fine
+
+# Output:
+# 101
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int max = call max(100, 101);
+    println max
+end

@@ -1,0 +1,20 @@
+# negative divMod number should work, truncating the division
+
+# Output:
+# div = -2
+# mod = 1
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    pair(int, int) dm = call divMod(-5, 2);
+    print "div = ";
+    int div = fst dm;
+    println div;
+    print "mod = ";
+    int mod = snd dm;
+    println mod
+end

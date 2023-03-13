@@ -1,0 +1,15 @@
+# all of a char array returns correctly
+
+# Output:
+# false
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    char[] arr = ['\0', '\0', '\0', '!', '\''];
+    bool a = call all(arr);
+    println a
+end

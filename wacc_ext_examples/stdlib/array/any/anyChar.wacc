@@ -1,0 +1,15 @@
+# any of a char array returns correctly
+
+# Output:
+# true
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    char[] arr = ['\0', '\0', '\0', '!', '\''];
+    bool a = call any(arr);
+    println a
+end

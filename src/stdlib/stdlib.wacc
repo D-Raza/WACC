@@ -1,6 +1,0 @@
-import "lib/math.wacc"
-import "lib/array.wacc"
-
-begin
-    skip
-end

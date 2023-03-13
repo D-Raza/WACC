@@ -1,0 +1,15 @@
+# last of a string array returns correctly
+
+# Output:
+# array!
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    string[] arr = ["This", "is", "a", "string", "array!"];
+    string l = call last(arr);
+    println l
+end

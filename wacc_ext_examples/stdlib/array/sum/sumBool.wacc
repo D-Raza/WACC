@@ -1,0 +1,15 @@
+# sum of a bool array returns correctly
+
+# Output:
+# 3
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    bool[] arr = [false, true, false, true, true];
+    int s = call sum(arr);
+    println s
+end

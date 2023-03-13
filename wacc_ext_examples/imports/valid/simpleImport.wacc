@@ -9,7 +9,7 @@
 
 # Program:
 
-import "lib/incDef.wacc"
+import "../incDef.wacc"
 
 begin
     int x = 0;

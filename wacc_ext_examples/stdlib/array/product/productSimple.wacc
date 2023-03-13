@@ -1,0 +1,15 @@
+# product of an int array returns correctly
+
+# Output:
+# 160650
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int[] arr = [7, 10, -51, 9, -5];
+    int p = call product(arr);
+    println p
+end

@@ -1,0 +1,14 @@
+# maximum of a number and zero should give the number
+
+# Output:
+# 151
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int max = call max(0, 151);
+    println max
+end

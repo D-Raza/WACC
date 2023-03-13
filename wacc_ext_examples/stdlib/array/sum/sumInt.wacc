@@ -1,0 +1,15 @@
+# head of an int array returns correctly
+
+# Output:
+# 72553
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int[] arr = [71120, 10, 516, 912, -5];
+    int s = call sum(arr);
+    println s
+end
