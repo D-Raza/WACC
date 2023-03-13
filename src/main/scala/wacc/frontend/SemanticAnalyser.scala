@@ -20,20 +20,37 @@ object SemanticAnalyser {
       program: Program
   )(implicit source: File): List[WACCError] = {
     val errors: mutable.ListBuffer[WACCError] = mutable.ListBuffer.empty
-    val functionDefs: mutable.Map[Ident, (Type, List[Type])] = mutable.Map.empty
+    val functionTableWithOverloading
+        : mutable.Map[Ident, List[(Type, List[Type])]] = mutable.Map.empty
     val localPrintTable = mutable.Map.empty[(Int, Int), Type]
     val localSymbolTable = mutable.Map.empty[Ident, Type]
 
     program match {
       case Program(funcs, stats) =>
         funcs.foreach(func => {
-          if (functionDefs contains func.ident)
-            errors += RedefinedFunctionError.genError(func.ident)
-
-          functionDefs += (func.ident -> (func.ty, func.paramList.map(_.ty)))
+          if (functionTableWithOverloading contains func.ident)
+            if (
+              functionTableWithOverloading(func.ident)
+                .contains((func.ty, func.paramList.map(_.ty)))
+            ) {
+              errors += RedefinedFunctionError.genError(func.ident)
+            } else {
+              // functionTableWithOverloading.updated(func.ident, functionTableWithOverloading(func.ident) ++ List((func.ty, func.paramList.map(_.ty))))
+              functionTableWithOverloading += (func.ident -> (functionTableWithOverloading(
+                func.ident
+              ) ++ List((func.ty, func.paramList.map(_.ty)))))
+            }
+          else {
+            // functionTableWithOverloading.updated(func.ident, List((func.ty, func.paramList.map(_.ty))))
+            functionTableWithOverloading += (func.ident -> List(
+              (func.ty, func.paramList.map(_.ty))
+            ))
+          }
         })
-        implicit val funcTable: Map[Ident, (Type, List[Type])] =
-          functionDefs.toMap
+        // implicit val funcTable: Map[Ident, (Type, List[Type])] =
+        //   functionDefs.toMap
+        implicit val funcTable: Map[Ident, List[(Type, List[Type])]] =
+          functionTableWithOverloading.toMap
 
         funcs.foreach(func => {
           val paramTable: mutable.Map[Ident, Type] = mutable.Map.empty
@@ -63,7 +80,7 @@ object SemanticAnalyser {
         localPrintTable ++= statPrintTable
 
     }
-    program.functionTable = functionDefs.toMap
+    program.functionTable = functionTableWithOverloading.toMap
     program.symbolTable = localSymbolTable.toMap
     program.printTable ++= localPrintTable
     (errors.toList)
@@ -89,7 +106,8 @@ object SemanticAnalyser {
       returnType: Option[Type]
   )(implicit
       source: File,
-      funcTable: Map[Ident, (Type, List[Type])]
+      // funcTable: Map[Ident, (Type, List[Type])]
+      functionTableWithOverloading: Map[Ident, List[(Type, List[Type])]]
   ): (List[WACCError], Map[Ident, Type], Map[(Int, Int), Type]) = {
     val errors: mutable.ListBuffer[WACCError] = mutable.ListBuffer.empty
     val printTable: mutable.Map[(Int, Int), Type] = mutable.Map.empty
@@ -334,7 +352,8 @@ object SemanticAnalyser {
     */
   private def evalTypeOfLValue(lValue: LValue)(implicit
       source: File,
-      funcTable: Map[Ident, (Type, List[Type])],
+      // funcTable: Map[Ident, (Type, List[Type])],
+      functionTableWithOverloading: Map[Ident, List[(Type, List[Type])]],
       symbolTable: Map[Ident, Type]
   ): (Type, List[WACCError], Map[(Int, Int), Type]) = {
     val errors: mutable.ListBuffer[WACCError] = mutable.ListBuffer.empty
@@ -421,7 +440,8 @@ object SemanticAnalyser {
     */
   private def evalTypeOfRValue(rValue: RValue)(implicit
       source: File,
-      funcTable: Map[Ident, (Type, List[Type])],
+      // funcTable: Map[Ident, (Type, List[Type])],
+      functionTableWithOverloading: Map[Ident, List[(Type, List[Type])]],
       symbolTable: Map[Ident, Type]
   ): (Type, List[WACCError], Map[(Int, Int), Type]) = {
     val errors: mutable.ListBuffer[WACCError] = mutable.ListBuffer.empty
@@ -464,33 +484,73 @@ object SemanticAnalyser {
           printTable.toMap ++ fstPrintTable ++ sndPrintTable
         )
       case c @ Call(f, args) =>
-        funcTable get f match {
-          case Some((_, _)) =>
+        functionTableWithOverloading get f match {
+          case Some(l) =>
             val (argTypes, argErrors, argPrintTable) =
               args.map(evalTypeOfExpr(_)).unzip3
             errors ++= argErrors.flatten
             printTable ++= argPrintTable.flatten
 
-            val (returnType, paramTypes) = funcTable(f)
-            if (argTypes.length != paramTypes.length)
-              errors += IncorrectNumberOfArgsError.genError(
-                f,
-                argTypes.length,
-                paramTypes.length
+            // Add arg types to call node
+            c.argTypes = argTypes
+
+            if (l.length == 1) {
+              val (returnType, paramTypes) = l.head
+              if (argTypes.length != paramTypes.length)
+                errors += IncorrectNumberOfArgsError.genError(
+                  f,
+                  argTypes.length,
+                  paramTypes.length
+                )
+
+              argTypes.zip(paramTypes).zipWithIndex.foreach {
+                case ((argType, paramType), i) =>
+                  if (!(argType equiv paramType))
+                    errors += TypeMismatchError.genError(
+                      argType,
+                      Set(paramType),
+                      args.toIndexedSeq(i).pos,
+                      s"function call to $f, argument $i"
+                    )
+              }
+              (returnType, errors.toList, printTable.toMap)
+            } else {
+              // map _.2 on l to get list of types
+              // zip with argTypes to get list of (List[Type], List[Type])
+              // filter out ones where length is not equal, if 0 then incorrect number of args error
+              // if not 0, go on to check if types are correct
+              val argLength = argTypes.length
+              val paramsValidNumArgs = l.map(_._2).filter(_.length == argLength)
+              if (paramsValidNumArgs.length == 0) {
+                errors += IncorrectNumberOfArgsError.genError(
+                  f,
+                  argLength,
+                  l.head._2.length // placeholder for now
+                )
+              }
+
+              // filter out ones in paramsValidNumArgs where the types do not match with argTypes
+              // if 0 then type mismatch error
+              val paramsValidTypes = paramsValidNumArgs.filter(
+                _.zip(argTypes).forall(x => x._1 equiv x._2)
               )
 
-            argTypes.zip(paramTypes).zipWithIndex.foreach {
-              case ((argType, paramType), i) =>
-                if (!(argType equiv paramType))
-                  errors += TypeMismatchError.genError(
-                    argType,
-                    Set(paramType),
-                    args.toIndexedSeq(i).pos,
-                    s"function call to $f, argument $i"
-                  )
+              // if 0 then type mismatch error
+              if (paramsValidTypes.length == 0 && argLength > 0) {
+                errors += TypeMismatchError.genError(
+                  argTypes.head,
+                  paramsValidNumArgs.head.toSet,
+                  args.toIndexedSeq.head.pos,
+                  s"function call to $f, argument 0"
+                )
+              }
+
+              val returnType = l.head._1
+
+              (returnType, errors.toList, printTable.toMap)
+
             }
 
-            (returnType, errors.toList, printTable.toMap)
           case None =>
             (
               ErrorType()(c.pos),
