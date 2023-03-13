@@ -92,7 +92,8 @@ object CodeGenerator {
             case arr: ArrayType =>
               arr.labelToString() // array type uses different label string method
             case pair: PairType =>
-              pair.labelToString() // pair type uses different label string method
+              pair
+                .labelToString() // pair type uses different label string method
             case _ => argType.toString
           }
         )

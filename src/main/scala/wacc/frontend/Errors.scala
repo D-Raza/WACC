@@ -133,8 +133,11 @@ object Errors {
   ) extends SemanticError {
     override val errorLines: Seq[String] = Seq(
       s"Ambiguous function call with types ${ident.name}(${gotArgs.mkString(", ")}): possible function types are ${possibleArgs
-      .map(_.mkString(",")).map(s => s"${ident.name}($s)")
-        .mkString(", ").replaceAll(", ([^,]+)$", " or $1")}")
+          .map(_.mkString(","))
+          .map(s => s"${ident.name}($s)")
+          .mkString(", ")
+          .replaceAll(", ([^,]+)$", " or $1")}"
+    )
   }
 
   case class IncorrectNumberOfArgsError(
@@ -145,9 +148,10 @@ object Errors {
   ) extends SemanticError {
     override val errorLines: Seq[String] = Seq(
       s"Incorrect number of arguments for function ${ident.name}. Expected ${expectedNoArgs.size match {
-        case 1 => expectedNoArgs.head
-        case _ => "one of " + expectedNoArgs.mkString(", ").replaceAll(", ([^,]+)$", " or $1")
-      }} arguments, got $gotNoArgs"
+          case 1 => expectedNoArgs.head
+          case _ =>
+            "one of " + expectedNoArgs.mkString(", ").replaceAll(", ([^,]+)$", " or $1")
+        }} arguments, got $gotNoArgs"
     )
   }
 
@@ -174,7 +178,8 @@ object Errors {
             }}:${if (containsErrorType(gotType)) ""
             else " got " + gotType.toString + ","} expected ${expectedTypes.size match {
               case 1 => expectedTypes.head
-              case _ => "one of " + expectedTypes.mkString(", ").replaceAll(", ([^,]+)$", " or $1")
+              case _ =>
+                "one of " + expectedTypes.mkString(", ").replaceAll(", ([^,]+)$", " or $1")
             }}"
         )
 
@@ -440,8 +445,8 @@ object Errors {
   }
 
   object IncorrectNumberOfArgsError {
-    def genError(ident: Ident, gotNoArgs: Int, expectedNoArgs: Set[Int])(implicit
-        source: File
+    def genError(ident: Ident, gotNoArgs: Int, expectedNoArgs: Set[Int])(
+        implicit source: File
     ): WACCError = {
       val pos = ident.pos
       WACCError(
