@@ -394,7 +394,7 @@ object SemanticAnalyser {
       case Fst(l) =>
         evalTypeOfLValue(l) match {
           case (PairType(fstTy, _), lValueErrors, lValPrintTable) =>
-            (fstTy.asType, lValueErrors, printTable.toMap ++ lValPrintTable)
+            (fstTy, lValueErrors, printTable.toMap ++ lValPrintTable)
           case (ty, lValueErrors, lValPrintTable) =>
             (
               ErrorType()(l.pos),
@@ -410,7 +410,7 @@ object SemanticAnalyser {
       case Snd(l) =>
         evalTypeOfLValue(l) match {
           case (PairType(_, sndTy), lValueErrors, lValPrintTable) =>
-            (sndTy.asType, lValueErrors, printTable.toMap ++ lValPrintTable)
+            (sndTy, lValueErrors, printTable.toMap ++ lValPrintTable)
           case (ty, lValueErrors, lValPrintTable) =>
             (
               ErrorType()(l.pos),
@@ -479,7 +479,7 @@ object SemanticAnalyser {
         errors ++= fstErrors
         errors ++= sndErrors
         (
-          PairType(fstType.eraseInnerTypes, sndType.eraseInnerTypes)(NULLPOS),
+          PairType(fstType, sndType)(NULLPOS),
           errors.toList,
           printTable.toMap ++ fstPrintTable ++ sndPrintTable
         )
@@ -564,7 +564,7 @@ object SemanticAnalyser {
         printTable ++= exprPrintTable
         exprType match {
           case PairType(fstType, _) =>
-            (fstType.asType, errors.toList, printTable.toMap)
+            (fstType, errors.toList, printTable.toMap)
           case _ => (ErrorType()(lValue.pos), errors.toList, printTable.toMap)
         }
       case Snd(lValue) =>
@@ -573,7 +573,7 @@ object SemanticAnalyser {
         printTable ++= exprPrintTable
         exprType match {
           case PairType(_, sndType) =>
-            (sndType.asType, errors.toList, printTable.toMap)
+            (sndType, errors.toList, printTable.toMap)
           case _ => (ErrorType()(lValue.pos), errors.toList, printTable.toMap)
         }
     }

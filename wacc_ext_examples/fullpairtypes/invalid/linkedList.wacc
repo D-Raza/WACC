@@ -1,0 +1,30 @@
+# this example is no longer valid since `x = y` assigns types strictly 
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+    pair(int, pair(int, int)) p = newpair(11, null) ;
+    pair(int, pair(int, pair(int, int))) q = newpair(4, p) ;
+    pair(int, pair(int, pair(int, pair(int, int)))) r = newpair(2, q) ;
+    pair(int, pair(int, pair(int, pair(int, pair(int, int))))) s = newpair(1, r) ;
+    print "list = {" ;
+    pair(int, pair(int, pair(int, pair(int, pair(int, int))))) x = s ;
+    pair(int, pair(int, pair(int, pair(int, int)))) y = snd x ;
+    int f = 0;
+    while y != null do
+      f = fst x ;
+      print f ;
+      print ", " ;
+      x = y ;
+      y = snd x
+    done ;
+    f = fst x ;
+    print f ;
+    println "}"
+end

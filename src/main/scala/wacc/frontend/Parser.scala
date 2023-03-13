@@ -1,7 +1,7 @@
 package wacc.frontend
 
 import parsley.Parsley._
-import parsley.combinator.{sepBy, sepBy1, some}
+import parsley.combinator.{sepBy, sepBy1, some, many}
 import parsley.errors.combinator._
 import parsley.expr._
 import parsley.io.ParseFromIO
@@ -18,6 +18,13 @@ object Parser {
   // Utilise our custom error builder
   implicit val waccErrorBuilder: WACCErrorBuilder =
     new WACCErrorBuilder
+
+  private lazy val `<source-file>` = fully(
+    SourceFile(many(`<import>`), `<program>`)
+  )
+
+  /* <import> ::= "import" <string-literal> */
+  private lazy val `<import>` = Import("import" *> STRING)
 
   /* <program> ::= "begin" (<func>)* <stat> (";" <stat>)* "end" */
   private lazy val `<program>` = fully(
@@ -97,7 +104,7 @@ object Parser {
   // <arg-list> ::= <expr> (‘,’ <expr>)*
   private lazy val `<arg-list>` = sepBy(`<expr>`, ",")
   // <type> ::= <base-type> | <array-type> | <pair-type>
-  private lazy val `<type>` = chain
+  private lazy val `<type>` : Parsley[Type] = chain
     .postfix(`<base-type>` <|> `<pair-type>`, `<array-type>`)
     .label("type")
     .explain(
@@ -114,13 +121,13 @@ object Parser {
   private lazy val `<array-type>` = ArrayType <# "[]".label("[] (array type)")
   // <pair-type> ::= ‘pair’ ‘(’ <pair-elem-type> ‘,’ <pair-elem-type> ‘)’
   private lazy val `<pair-type>` = PairType(
-    "pair" *> "(" *> `<pair-elem-type>` <* ",",
-    `<pair-elem-type>` <* ")"
+    "pair" *> "(" *> `<type>` <* ",",
+    `<type>` <* ")"
   )
   // <pair-elem-type> ::= <base-type> | <array-type> | "pair"
-  private lazy val `<pair-elem-type>` : Parsley[PairElemType] = attempt(
-    chain.postfix1(`<base-type>` <|> `<pair-type>`, `<array-type>`)
-  ) <|> `<base-type>` <|> (InnerPairType <# "pair")
+  // private lazy val `<pair-elem-type>` : Parsley[PairElemType] = attempt(
+  //   chain.postfix1(`<base-type>` <|> `<pair-type>`, `<array-type>`)
+  // ) <|> `<base-type>` <|> (InnerPairType <# "pair")
   private lazy val `<expr>` : Parsley[Expr] = precedence(
     SOps(InfixR)(Or <# "||".label("binary operator")) +:
       SOps(InfixR)(And <# "&&".label("binary operator")) +:
@@ -202,7 +209,7 @@ object Parser {
     * @return
     *   the parsed program
     */
-  def parse(input: File): Result[WACCError, Program] =
-    `<program>`.parseFromFile(input).get
+  def parse(input: File): Result[WACCError, SourceFile] =
+    `<source-file>`.parseFromFile(input).get
 
 }

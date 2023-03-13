@@ -167,7 +167,7 @@ object Errors {
       case ErrorType()   => true
       case ArrayType(ty) => containsErrorType(ty)
       case PairType(fstType, sndType) =>
-        containsErrorType(fstType.asType) || containsErrorType(sndType.asType)
+        containsErrorType(fstType) || containsErrorType(sndType)
       case _ => false
     }
   }

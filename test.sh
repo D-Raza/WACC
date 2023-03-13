@@ -38,15 +38,24 @@ fi
 
 # Get the total number of test cases
 no_files=$(echo "$files" | wc -l)
-if [ $no_files -lt 2 ]; then
+if [ $no_files -eq 0 ]; then
     echo -e "\e[1;31m[ERROR] No test cases found in $dir.\e[0m"
     exit 1
 fi
 
-
+# extract the first level directory using cut
+if [[ $dir == "./"* ]]; then
+  basedir=$(dirname "$dir" | cut -d "/" -f2)
+else
+  basedir=$(dirname "./$dir" | cut -d "/" -f2)
+fi
+if ! basedir_files=$(find $basedir -type f -name "*.wacc"); then
+    exit 1
+fi
+no_basedir_files=$(echo "$basedir_files" | wc -l)
 
 echo -e "\e[1;35m-----\e[0m \e[1;4;35mWACC Tests\e[0m \e[1;35m-----\e[0m" | tee -a >(sed -r 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[m|K]//g' > $LOGFILE)
-echo -e "\e[1;35mRunning $no_files tests in $dir\e[0m" | tee -a >(sed -r 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[m|K]//g' > $LOGFILE)
+echo -e "\e[1;35mRunning $no_files tests in $dir (out of $no_basedir_files total in $basedir)\e[0m" | tee -a >(sed -r 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[m|K]//g' > $LOGFILE)
 
 # Test a file
 test_task() {
@@ -70,13 +79,13 @@ test_task() {
     fi
     
     # Account for invalid exit codes
-    if [ "$expected_runtime_exit_code" -ne 100 ] && [ "$expected_runtime_exit_code" -ne 200 ]; then
+    if [ "$expected_runtime_exit_code" -ne 100 ] && [ "$expected_runtime_exit_code" -ne 200 ] && [ "$expected_runtime_exit_code" -ne 150 ]; then
         expected_compiler_exit_code=0
     else
         expected_compiler_exit_code=$expected_runtime_exit_code
     fi
     
-    compiler_output=$(./compile "$file")
+    compiler_output=$(./compile "$file" P)
     compiler_exit_code=$?
 
     if [ $expected_compiler_exit_code -eq $compiler_exit_code ]; then
