@@ -1,0 +1,15 @@
+# all of an empty array is true
+
+# Output:
+# true
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int[] empty = [];
+    bool a = call all(empty);
+    println a
+end

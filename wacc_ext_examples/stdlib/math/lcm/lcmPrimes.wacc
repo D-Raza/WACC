@@ -1,0 +1,14 @@
+# lowest common multiple of two prime numbers should give the product
+
+# Output:
+# true
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int lcm = call lcm(7, 3);
+    println lcm == (7 * 3)
+end

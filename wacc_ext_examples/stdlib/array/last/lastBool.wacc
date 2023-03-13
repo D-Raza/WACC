@@ -1,0 +1,15 @@
+# last of a bool array returns correctly
+
+# Output:
+# true
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    bool[] arr = [false, true, false, true, true];
+    bool l = call last(arr);
+    println l
+end

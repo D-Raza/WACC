@@ -1,0 +1,14 @@
+# greatest common divisor of two zeroes should give zero
+
+# Output:
+# 0
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int gcd = call gcd(0, 0);
+    println gcd
+end

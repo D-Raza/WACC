@@ -1,0 +1,14 @@
+# minimum of two negative integers should work fine
+
+# Output:
+# -8
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int min = call min(-8, -3);
+    println min
+end

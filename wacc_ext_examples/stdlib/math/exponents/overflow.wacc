@@ -1,0 +1,19 @@
+# testing overflow limit
+
+# Exit:
+# 255
+
+# Output:
+# 1073741824
+# #runtime_error#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int x = 2;
+    int not_overflow = call pow(x, 30);
+    println not_overflow;
+    int overflow = call pow(x, 31)
+end

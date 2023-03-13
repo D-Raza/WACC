@@ -1,0 +1,15 @@
+# head of a bool array returns correctly
+
+# Output:
+# false
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    bool[] arr = [false, true, false, true, true];
+    bool h = call head(arr);
+    println h
+end

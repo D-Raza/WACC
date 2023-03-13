@@ -1,0 +1,15 @@
+# any of a bool array returns correctly
+
+# Output:
+# true
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    bool[] arr = [false, false, false, false, true];
+    bool a = call any(arr);
+    println a
+end

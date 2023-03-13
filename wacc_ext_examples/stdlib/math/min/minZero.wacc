@@ -1,0 +1,14 @@
+# minimum of a number and zero should give the number
+
+# Output:
+# 0
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int min = call min(0, 151);
+    println min
+end

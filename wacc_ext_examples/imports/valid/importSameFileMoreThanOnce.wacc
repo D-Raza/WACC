@@ -1,0 +1,21 @@
+# this program imports incDef twice and should work fine
+
+# Input: 69
+
+# Output:
+# enter a number to increment:
+# 70
+#
+
+# Program:
+
+import "../incDef.wacc"
+import "./../incDef.wacc"
+
+begin
+    int x = 0;
+    println "enter a number to increment:";
+    read x;
+    x = call inc(x);
+    println x
+end

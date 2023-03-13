@@ -1,0 +1,9 @@
+# a source file that is part of a cycle of imports should not infinitely loop
+
+# Program:
+
+import "crossFileCircularDep2.wacc"
+
+begin
+    skip
+end

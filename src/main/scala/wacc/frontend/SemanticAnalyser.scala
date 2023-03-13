@@ -484,7 +484,6 @@ object SemanticAnalyser {
           printTable.toMap ++ fstPrintTable ++ sndPrintTable
         )
       case c @ Call(f, args) =>
-        println(s"functable contains: ${functionTableWithOverloading get f}")
         functionTableWithOverloading get f match {
           case Some(l) =>
             val (argTypes, argErrors, argPrintTable) =

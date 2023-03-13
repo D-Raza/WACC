@@ -1,0 +1,15 @@
+# a source file that imports a nonexistent file should not compile
+
+# Output:
+# #file_error#
+
+# Exit:
+# 150
+
+# Program:
+
+import "doesNotExist.wacc"
+
+begin
+    skip
+end

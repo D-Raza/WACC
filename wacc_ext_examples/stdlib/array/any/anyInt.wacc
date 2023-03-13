@@ -1,0 +1,15 @@
+# any of an int array returns correctly
+
+# Output:
+# false
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int[] arr = [0, 0, 0, 0];
+    bool a = call any(arr);
+    println a
+end
