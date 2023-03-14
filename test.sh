@@ -85,7 +85,7 @@ test_task() {
         expected_compiler_exit_code=$expected_runtime_exit_code
     fi
     
-    compiler_output=$(./compile "$file" P)
+    compiler_output=$(./compile "$file" P O)
     compiler_exit_code=$?
 
     if [ $expected_compiler_exit_code -eq $compiler_exit_code ]; then

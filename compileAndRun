@@ -5,7 +5,7 @@ filename=$(basename -- $filepath)
 filename_no_ext="${filename%.*}"
 
 # Compile the file
-./compile $filepath P
+./compile $filepath P O
 
 # Run the file
 arm-linux-gnueabi-gcc -o "$filename_no_ext" -mcpu=arm1176jzf-s -mtune=arm1176jzf-s "$filename_no_ext.s"

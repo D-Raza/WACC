@@ -4,7 +4,7 @@ import wacc.backend._
 
 object Peephole {
 
-  def peephole()(implicit
+  def optimise(
       instructions: mutable.ListBuffer[Instruction]
   ): mutable.ListBuffer[Instruction] = {
     var instr = instructions

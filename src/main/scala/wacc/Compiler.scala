@@ -26,7 +26,9 @@ object Compiler {
     // Checking for an input file
     if (args.length < 1) {
       System.err.println("  Too few arguments!")
-      System.err.println("  Usage: ./compile [FILE] {(P)arallel (D)ebug (O)ptimise}")
+      System.err.println(
+        "  Usage: ./compile [FILE] {(P)arallel (D)ebug (O)ptimise}"
+      )
       System.exit(FILE_ERR_CODE)
     }
 
@@ -55,12 +57,13 @@ object Compiler {
         val elapsedTime = System.nanoTime() - startTime
 
         if (DEBUG) {
-          println(
-            s"Code generation took ${elapsedTime / 1000000}ms - ${if (PARALLEL) "parallel"
-              else "sequential"}} code generation"
-          )
           println("Instructions:")
           instructions.foreach(println)
+          println()
+          println(
+            s"${if (PARALLEL) "Parallel"
+              else "Sequential"} code generation took ${elapsedTime / 1000000}ms"
+          )
           println()
         }
 

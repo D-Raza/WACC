@@ -53,10 +53,14 @@ object CodeGenerator {
     if (parallel) {
       val tasks: Seq[Future[mutable.ListBuffer[Instruction]]] =
         for (func <- programNode.funcs) yield Future {
-          compileFunc(func)(
+          val funcInstructions = compileFunc(func)(
             new CodeGenState,
             programNode.functionTable
           )
+          if (optimize)
+            Peephole.optimise(funcInstructions)
+          else
+            funcInstructions
         }
       val aggregated: Future[Seq[mutable.ListBuffer[Instruction]]] =
         Future.sequence(tasks)
@@ -67,26 +71,23 @@ object CodeGenerator {
         instructions ++= funcInstructions
       )
     } else {
-      val funcInstructions = mutable.ListBuffer.empty[Instruction]
-
       programNode.funcs.foreach(func => {
-        funcInstructions ++= compileFunc(func)(
+        val funcInstructions = compileFunc(func)(
           new CodeGenState,
           programNode.functionTable
         )
+        if (optimize)
+          instructions ++= Peephole.optimise(funcInstructions)
+        else
+          instructions ++= funcInstructions
       })
-
-      instructions ++= funcInstructions
     }
 
     Utils.addUtils()(instructions)
 
     mainLabels.addLabelInstructions(instructions)
 
-    if (optimize)
-      Peephole.peephole()(instructions)
-    else
-      instructions
+    instructions
   }
 
   private def funcLabel(funcIdent: Ident, argTypes: List[Type]): String = {

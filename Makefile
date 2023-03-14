@@ -1,5 +1,5 @@
-#milestone := "wacc_examples/valid/!(pairs|advanced|runtimeErr)"
 milestone := "wacc_ext_examples"
+#milestone := "wacc_examples/valid/!(pairs|advanced|runtimeErr)"
 
 all: build
 
