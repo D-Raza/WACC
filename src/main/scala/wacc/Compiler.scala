@@ -62,7 +62,8 @@ object Compiler {
           println()
           println(
             s"${if (PARALLEL) "Parallel"
-              else "Sequential"} code generation took ${elapsedTime / 1000000}ms"
+              else "Sequential"} code generation${if (OPTIMIZE) " with optimisation "
+              else " "}took ${elapsedTime / 1000000}ms"
           )
           println()
         }
@@ -98,8 +99,11 @@ object Compiler {
       System.exit(FILE_ERR_CODE)
     }
 
-    if (DEBUG)
+    if (DEBUG) {
+      println("Source file:")
       Source.fromFile(inputFile).getLines().foreach(println);
+      println()
+    }
 
     // Frontend
     println(s"Compiling $inputFile...")
@@ -147,10 +151,12 @@ object Compiler {
         val errors = checkProgramSemantics(program)
         if (errors.isEmpty) {
           println(s"No errors found in $inputFile!")
+          println()
           (Some(program), 0)
         } else {
-          println(s"Errors found in $inputFile:")
+          println(s"Error(s) found in $inputFile:")
           errors.foreach(println)
+          println()
           (None, SEMANTIC_ERR_CODE)
         }
       }
