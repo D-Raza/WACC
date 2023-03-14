@@ -20,12 +20,13 @@ object Compiler {
 
   var DEBUG = false
   var PARALLEL = false
+  // var PEEPHOLE_OPTIMISATION = false
 
   def main(args: Array[String]): Unit = {
     // Checking for an input file
     if (args.length < 1) {
       System.err.println("  Too few arguments!")
-      System.err.println("  Usage: ./compile [FILE] {(P)arallel (D)ebug}")
+      System.err.println("  Usage: ./compile [FILE] {(P)arallel (D)ebug (O)ptimise)}")
       System.exit(-1)
     }
 
@@ -34,6 +35,7 @@ object Compiler {
     val restArgs = args.drop(1)
     DEBUG = restArgs.contains("D")
     PARALLEL = restArgs.contains("P")
+    // PEEPHOLE_OPTIMISATION = restArgs.contains("O")
 
     val (program, exitCode) =
       parseFile(inputFile, mutable.Set(inputFile.getCanonicalPath()))

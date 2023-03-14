@@ -9,6 +9,7 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Await
 import scala.concurrent.duration._
+// import wacc.extension.peephole.Peephole
 
 object CodeGenerator {
 
@@ -80,6 +81,9 @@ object CodeGenerator {
     Utils.addUtils()(instructions)
 
     mainLabels.addLabelInstructions(instructions)
+
+    // Peephole.peephole()(instructions)
+
     instructions
   }
 
