@@ -10,7 +10,7 @@ import scala.collection.mutable
 
 class PeepholeTest extends AnyFlatSpec {
 
-    "replaceMovAddWithAdd" should "replace mov add with add add" in {
+    "replaceMovAddWithAdd" should "replace mov add with just add" in {
         val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer(
             Move(R2, ImmVal(1)),
             AddInstr(R3, R4, R2)

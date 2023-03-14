@@ -95,12 +95,12 @@ class OverloadingTests extends AnyFlatSpec {
   }
 
   "All valid programs with overloading" should "return exit code 0" in {
-    val exitCode = getExitCode("wacc_overloading_examples/valid")
+    val exitCode = getExitCode("wacc_ext_examples/overloading/valid")
     assert(exitCode == 0)
   }
 
   "All invalid programs with overloading" should "return exit code 200" in {
-    val exitCode = getExitCode("wacc_overloading_examples/invalid")
+    val exitCode = getExitCode("wacc_ext_examples/overloading/invalid")
     assert(exitCode == 200)
   }
 
