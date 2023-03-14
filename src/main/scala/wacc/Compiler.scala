@@ -20,6 +20,7 @@ object Compiler {
 
   var DEBUG = false
   var PARALLEL = false
+  var OPTIMIZE = false
 
   def main(args: Array[String]): Unit = {
     // Checking for an input file
@@ -34,6 +35,7 @@ object Compiler {
     val restArgs = args.drop(1)
     DEBUG = restArgs.contains("D")
     PARALLEL = restArgs.contains("P")
+    OPTIMIZE = restArgs.contains("O")
 
     val (program, exitCode) =
       parseFile(inputFile, mutable.Set(inputFile.getCanonicalPath()))
@@ -45,7 +47,11 @@ object Compiler {
         implicit val state = CodeGenState()
 
         val startTime = System.nanoTime()
-        instructions ++= CodeGenerator.compileProgram(program.get, PARALLEL)
+        instructions ++= CodeGenerator.compileProgram(
+          program.get,
+          PARALLEL,
+          OPTIMIZE
+        )
         val elapsedTime = System.nanoTime() - startTime
 
         if (DEBUG) {
