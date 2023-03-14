@@ -26,7 +26,7 @@ object Compiler {
     // Checking for an input file
     if (args.length < 1) {
       System.err.println("  Too few arguments!")
-      System.err.println("  Usage: ./compile [FILE] {(P)arallel (D)ebug}")
+      System.err.println("  Usage: ./compile [FILE] {(P)arallel (D)ebug (O)ptimise}")
       System.exit(FILE_ERR_CODE)
     }
 
