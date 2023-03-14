@@ -1,0 +1,16 @@
+# head of an empty array is a runtime error
+
+# Exit:
+# 255
+
+# Output:
+# #runtime_error#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int[] empty = [];
+    int h = call head(empty)
+end

@@ -1,0 +1,15 @@
+# basic square
+
+# Output:
+# 49
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int x = 7;
+    int x_squared = call square(x);
+    println x_squared
+end

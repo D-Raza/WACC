@@ -125,14 +125,33 @@ object Errors {
     )
   }
 
-  case class IncorrectNumberOfArgsError(
+  case class AmbiguousFunctionCallError(
       ident: Ident,
-      gotNoArgs: Int,
-      expectedNoArgs: Int,
+      gotArgs: List[Type],
+      possibleArgs: Set[List[Type]],
       lineInfo: WACCLineInfo
   ) extends SemanticError {
     override val errorLines: Seq[String] = Seq(
-      s"Incorrect number of arguments for function ${ident.name}. Expected $expectedNoArgs arguments, got $gotNoArgs arguments"
+      s"Ambiguous function call with types ${ident.name}(${gotArgs.mkString(", ")}): possible function types are ${possibleArgs
+          .map(_.mkString(","))
+          .map(s => s"${ident.name}($s)")
+          .mkString(", ")
+          .replaceAll(", ([^,]+)$", " or $1")}"
+    )
+  }
+
+  case class IncorrectNumberOfArgsError(
+      ident: Ident,
+      gotNoArgs: Int,
+      expectedNoArgs: Set[Int],
+      lineInfo: WACCLineInfo
+  ) extends SemanticError {
+    override val errorLines: Seq[String] = Seq(
+      s"Incorrect number of arguments for function ${ident.name}. Expected ${expectedNoArgs.size match {
+          case 1 => expectedNoArgs.head
+          case _ =>
+            "one of " + expectedNoArgs.mkString(", ").replaceAll(", ([^,]+)$", " or $1")
+        }} arguments, got $gotNoArgs"
     )
   }
 
@@ -159,7 +178,8 @@ object Errors {
             }}:${if (containsErrorType(gotType)) ""
             else " got " + gotType.toString + ","} expected ${expectedTypes.size match {
               case 1 => expectedTypes.head
-              case _ => "one of " + expectedTypes.mkString(", ")
+              case _ =>
+                "one of " + expectedTypes.mkString(", ").replaceAll(", ([^,]+)$", " or $1")
             }}"
         )
 
@@ -352,6 +372,27 @@ object Errors {
     }
   }
 
+  object AmbiguousFunctionCallError {
+    def genError(
+        id: Ident,
+        gotArgs: List[Type],
+        possibleArgs: Set[List[Type]]
+    )(implicit source: File): WACCError = {
+      val pos = id.pos
+      val errorWidth = id.name.length()
+      WACCError(
+        pos,
+        source,
+        new AmbiguousFunctionCallError(
+          id,
+          gotArgs,
+          possibleArgs,
+          WACCLineInfo.genLineInfo(pos, errorWidth)
+        )
+      )
+    }
+  }
+
   object TypeMismatchError {
     def genError(
         gotType: Type,
@@ -404,8 +445,8 @@ object Errors {
   }
 
   object IncorrectNumberOfArgsError {
-    def genError(ident: Ident, gotNoArgs: Int, expectedNoArgs: Int)(implicit
-        source: File
+    def genError(ident: Ident, gotNoArgs: Int, expectedNoArgs: Set[Int])(
+        implicit source: File
     ): WACCError = {
       val pos = ident.pos
       WACCError(

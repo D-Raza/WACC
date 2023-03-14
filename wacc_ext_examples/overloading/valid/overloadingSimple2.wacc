@@ -1,0 +1,21 @@
+# overloading function 
+
+# Output:
+# false
+#
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  bool f(bool x, int y, bool z) is
+    return false
+	end
+  bool f(bool x, bool y, bool z) is
+    return true
+  end
+  bool x = call f(true, 0, false) ;
+  println x
+end

@@ -1,0 +1,15 @@
+# divMod of some number and zero throws a runtime error
+
+# Exit:
+# 255
+
+# Output:
+# #runtime_error#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    pair(int, int) dm = call divMod(5, 0)
+end

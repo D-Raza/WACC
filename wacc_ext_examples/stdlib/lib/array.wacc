@@ -1,0 +1,215 @@
+# ARRAY FUNCTIONS
+begin
+    # @note functions on pair arrays cannot be pre-written currently since we have full typing (requires notion of generics)
+
+    # The first element of an array.
+    # @param arr the array
+    # @return the first element of the array
+    int head(int[] arr) is
+        return arr[0]
+    end
+    bool head(bool[] arr) is
+        return arr[0]
+    end
+    char head(char[] arr) is
+        return arr[0]
+    end
+    string head(string[] arr) is
+        return arr[0]
+    end
+
+    # The last element of an array.
+    # @param arr the array
+    # @return the last element of the array
+    int last(int[] arr) is
+        return arr[len arr - 1]
+    end
+    bool last(bool[] arr) is
+        return arr[len arr - 1]
+    end
+    char last(char[] arr) is
+        return arr[len arr - 1]
+    end
+    string last(string[] arr) is
+        return arr[len arr - 1]
+    end
+
+    # Sum the elements of an array.
+    # @note for boolean arrays, this function returns the number of true elements in the array
+    # @param arr the array
+    # @return the sum of all the elements of the array
+    int sum(int[] arr) is
+        int sum = 0;
+        int arrLen = len arr;
+        int i = 0;
+        while (i < arrLen) do
+            sum = sum + arr[i];
+            i = i + 1
+        done;
+        return sum
+    end
+    int sum(bool[] arr) is
+        int sum = 0;
+        int arrLen = len arr;
+        int i = 0;
+        while (i < arrLen) do
+            if (arr[i]) then
+                sum = sum + 1
+            else
+                skip
+            fi;
+            i = i + 1
+        done;
+        return sum
+    end
+
+    # Product of the elements of an integer array
+    # @param arr the array
+    # @returns the product of all the elements of the array
+    int product(int[] arr) is
+        int prod = 1;
+        int arrLen = len arr;
+        int i = 0;
+        while (i < arrLen) do
+            prod = prod * arr[i];
+            i = i + 1
+        done;
+        return prod
+    end
+
+    # These functions are equivalent to folding with 'or'
+    # @note empty arrays are considered to be all false
+    # @param arr the array
+    # @returns true if any of the elements in the array are true, not zero or the null character, false otherwise
+    bool any(bool[] arr) is
+        int arrLen = len arr;
+        int i = 0;
+        while (i < arrLen) do
+            if (arr[i]) then
+                return true
+            else
+                skip
+            fi;
+            i = i + 1
+        done;
+        return false
+    end
+    bool any(int[] arr) is
+        int arrLen = len arr;
+        int i = 0;
+        while (i < arrLen) do
+            if (arr[i] != 0) then
+                return true
+            else
+                skip
+            fi;
+            i = i + 1
+        done;
+        return false
+    end
+    bool any(char[] arr) is
+        int arrLen = len arr;
+        int i = 0;
+        while (i < arrLen) do
+            if (arr[i] != '\0') then
+                return true
+            else
+                skip
+            fi;
+            i = i + 1
+        done;
+        return false
+    end
+
+    # These functions are equivalent to folding with 'and'
+    # @note empty arrays are considered to be all true
+    # @param arr the array
+    # @returns true if all of the elements in the array are true, not zero or the null character, false otherwise
+    bool all(bool[] arr) is
+        int arrLen = len arr;
+        int i = 0;
+        while (i < arrLen) do
+            if (arr[i]) then
+                skip
+            else
+                return false
+            fi;
+            i = i + 1
+        done;
+        return true
+    end
+    bool all(int[] arr) is
+        int arrLen = len arr;
+        int i = 0;
+        while (i < arrLen) do
+            if (arr[i] != 0) then
+                skip
+            else
+                return false
+            fi;
+            i = i + 1
+        done;
+        return true
+    end
+    bool all(char[] arr) is
+        int arrLen = len arr;
+        int i = 0;
+        while (i < arrLen) do
+            if (arr[i] != '\0') then
+                skip
+            else
+                return false
+            fi;
+            i = i + 1
+        done;
+        return true
+    end
+
+    # Computes the greatest element in an integer array.
+    # @param arr the array
+    # @returns the greatest element in arr
+    int maximum(int[] arr) is
+        if ((len arr) == 1)
+        then
+            return arr[0]
+        else
+            int i = 0 ;
+            int res = arr[i] ;
+            while (i < (len arr) - 1) do
+                if (res < arr[i+1])
+                then
+                    res = arr[i+1]
+                else
+                    skip
+                fi ;
+                i = i + 1
+            done ;
+            return res
+        fi
+    end
+
+    # Computes the least element in an integer array.
+    # @param arr the array
+    # @returns the least element in arr
+    int minimum(int[] arr) is
+        if ((len arr) == 1)
+        then
+            return arr[0]
+        else
+            int i = 0 ;
+            int res = arr[i] ;
+            while (i < (len arr) - 1) do
+                if (res > arr[i+1])
+                then
+                    res = arr[i+1]
+                else
+                    skip
+                fi ;
+                i = i + 1 
+            done ;
+            return res
+        fi
+    end
+
+    skip
+end

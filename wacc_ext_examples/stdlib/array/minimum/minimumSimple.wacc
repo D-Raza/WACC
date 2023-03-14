@@ -1,0 +1,15 @@
+# minimum of an int array returns correctly
+
+# Output:
+# -5
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int[] arr = [71120, 10, 516, 912, -5];
+    int s = call minimum(arr);
+    println s
+end

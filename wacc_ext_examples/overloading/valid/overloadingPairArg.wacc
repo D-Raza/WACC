@@ -1,0 +1,29 @@
+# overloading function
+
+# Output:
+# 15
+# 1
+#
+
+# Program:
+
+begin
+
+  int pairFirst(pair(int, int) p, int x) is
+    int y = fst p ; 
+    x = x + y ;
+    return x
+  end
+
+  int pairFirst(pair(int, bool) p) is
+    int x = fst p ;
+    return x
+  end
+
+  pair(int, int) p1 = newpair(10,15) ;
+  int first1 = call pairFirst(p1, 5) ;
+  pair(int, bool) p2 = newpair(1, false) ;
+  int first2 = call pairFirst(p2) ;
+  println first1 ;  # 15
+  println first2    # 1
+end

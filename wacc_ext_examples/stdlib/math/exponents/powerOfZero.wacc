@@ -1,0 +1,15 @@
+# power of zero is always 1
+
+# Output:
+# 1
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int x = 12345;
+    int x_squared = call pow(x, 0);
+    println x_squared
+end

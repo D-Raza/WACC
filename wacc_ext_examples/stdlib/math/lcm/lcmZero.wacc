@@ -1,0 +1,14 @@
+# lowest common multiple of a number and zero should give zero
+
+# Output:
+# 0
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int lcm = call lcm(0, 151);
+    println lcm
+end

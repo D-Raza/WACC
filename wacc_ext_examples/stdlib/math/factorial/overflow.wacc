@@ -1,0 +1,18 @@
+# testing overflow limit
+
+# Exit:
+# 255
+
+# Output:
+# 479001600
+# #runtime_error#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int not_overflow = call factorial(12);
+    println not_overflow;
+    int overflow = call factorial(13)
+end

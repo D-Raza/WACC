@@ -1,0 +1,15 @@
+# basic cube
+
+# Output:
+# 125
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int x = 5;
+    int x_cubed = call cube(x);
+    println x_cubed
+end

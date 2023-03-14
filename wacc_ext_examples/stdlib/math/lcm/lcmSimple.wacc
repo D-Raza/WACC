@@ -1,0 +1,14 @@
+# lowest common multiple of two integers should work fine
+
+# Output:
+# 24
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int gcd = call lcm(8, 12);
+    println gcd
+end

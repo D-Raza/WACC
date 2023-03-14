@@ -1,0 +1,14 @@
+# greatest common divisor of two prime numbers should work fine
+
+# Output:
+# 1
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int gcd = call gcd(7, 3);
+    println gcd
+end

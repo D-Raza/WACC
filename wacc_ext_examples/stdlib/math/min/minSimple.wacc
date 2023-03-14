@@ -1,0 +1,14 @@
+# minimum of two integers should work fine
+
+# Output:
+# 100
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int min = call min(100, 101);
+    println min
+end

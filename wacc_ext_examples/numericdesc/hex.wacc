@@ -1,0 +1,12 @@
+# integer literals can now be hexadecimal
+
+# Output:
+# 10
+#
+
+# Program:
+
+begin
+    int a = 0xA;
+    println a
+end

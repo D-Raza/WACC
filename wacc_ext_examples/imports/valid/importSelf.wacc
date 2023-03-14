@@ -1,0 +1,9 @@
+# a source file that imports itself should compile without infinitely looping
+
+# Program:
+
+import "importSelf.wacc"
+
+begin
+    skip
+end

@@ -1,0 +1,15 @@
+# absolute value of a positive integer returns the same number
+
+# Output:
+# 5
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int x = 5;
+    int abs_x = call abs(x);
+    println abs_x
+end

@@ -1,0 +1,14 @@
+# maximum of two negative integers should work fine
+
+# Output:
+# -3
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int max = call max(-8, -3);
+    println max
+end

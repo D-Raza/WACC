@@ -1,0 +1,8 @@
+import "lib/math.wacc"
+import "lib/array.wacc"
+
+begin
+    char[] arr = ['a', 'a', 'a'];
+    bool a = call all(arr);
+    println a
+end

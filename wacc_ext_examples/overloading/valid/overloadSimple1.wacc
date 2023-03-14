@@ -1,0 +1,21 @@
+# overloading function 
+
+# Output:
+# 100
+#
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  int f(bool x) is
+    return 10
+	end
+  int f(int x) is
+    return 100
+  end
+  int x = call f(1) ;
+  println x
+end

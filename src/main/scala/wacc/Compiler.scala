@@ -16,7 +16,7 @@ import wacc.backend.CodeGenState
 object Compiler {
   private val SYNTAX_ERR_CODE = 100
   private val SEMANTIC_ERR_CODE = 200
-  private val IMPORT_ERR_CODE = 150
+  private val FILE_ERR_CODE = 150
 
   var DEBUG = false
   var PARALLEL = false
@@ -26,10 +26,8 @@ object Compiler {
     // Checking for an input file
     if (args.length < 1) {
       System.err.println("  Too few arguments!")
-      System.err.println(
-        "  Usage: ./compile [FILE] {(P)arallel (D)ebug (O)ptimise)}"
-      )
-      System.exit(-1)
+      System.err.println("  Usage: ./compile [FILE] {(P)arallel (D)ebug}")
+      System.exit(FILE_ERR_CODE)
     }
 
     val inputFile = new File(args(0))
@@ -90,11 +88,11 @@ object Compiler {
     // File validation
     if (!inputFile.exists()) {
       System.err.println(f"$inputFile does not exist! Exiting...")
-      System.exit(-1)
+      System.exit(FILE_ERR_CODE)
     }
     if (!inputFile.isFile()) {
       System.err.println(f"$inputFile is not a file! Exiting...")
-      System.exit(-1)
+      System.exit(FILE_ERR_CODE)
     }
 
     if (DEBUG)
@@ -116,7 +114,7 @@ object Compiler {
         implicit val source: File = inputFile
         var program = x.program
 
-        if (DEBUG) {
+        if (DEBUG && !x.imports.isEmpty) {
           println("Imports:")
           x.imports.foreach(println)
           println()
@@ -126,35 +124,31 @@ object Compiler {
           .map(inputFile.getParent + "/" + _.filepath)
           .map(new File(_))
           .filter(fp => !alreadyImported.contains(fp.getCanonicalPath()))
-        if (importFiles.length != x.imports.length) {
-          println(s"Circular dependency detected in $inputFile!")
-          return (None, IMPORT_ERR_CODE)
-        } else {
-          while (!importFiles.isEmpty) {
-            val f = importFiles.head
-            parseFile(f, alreadyImported += f.getCanonicalPath()) match {
-              case (Some(importProgram), _) => {
-                program = program.copy(funcs =
-                  program.funcs ++ importProgram.funcs
-                )(NULLPOS)
-              }
-              case (None, exitCode) => {
-                println(s"Error(s) parsing imported file: ${f.getName}!")
-                return (None, exitCode)
-              }
+          .distinctBy(_.getCanonicalPath())
+        while (!importFiles.isEmpty) {
+          val f = importFiles.head
+          parseFile(f, alreadyImported += f.getCanonicalPath()) match {
+            case (Some(importProgram), _) => {
+              program = program.copy(funcs =
+                program.funcs ++ importProgram.funcs
+              )(NULLPOS)
             }
-            importFiles = importFiles.tail
+            case (None, exitCode) => {
+              println(s"Error(s) parsing imported file: ${f.getName}!")
+              return (None, exitCode)
+            }
           }
+          importFiles = importFiles.tail
+        }
 
-          val errors = checkProgramSemantics(program)
-          if (errors.isEmpty) {
-            println("No errors found!")
-            (Some(program), 0)
-          } else {
-            println(s"Errors found in $inputFile:")
-            errors.foreach(println)
-            (None, SEMANTIC_ERR_CODE)
-          }
+        val errors = checkProgramSemantics(program)
+        if (errors.isEmpty) {
+          println(s"No errors found in $inputFile!")
+          (Some(program), 0)
+        } else {
+          println(s"Errors found in $inputFile:")
+          errors.foreach(println)
+          (None, SEMANTIC_ERR_CODE)
         }
       }
       case Failure(msg) => { println(msg); (None, SYNTAX_ERR_CODE) }

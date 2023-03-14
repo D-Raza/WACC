@@ -1,0 +1,14 @@
+# greatest common divisor of a number and zero should give the number
+
+# Output:
+# 151
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int gcd = call gcd(0, 151);
+    println gcd
+end

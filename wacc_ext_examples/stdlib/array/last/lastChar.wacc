@@ -1,0 +1,15 @@
+# head of a char array returns correctly
+
+# Output:
+# '
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    char[] arr = ['z', 'a', '\0', '!', '\''];
+    char l = call last(arr);
+    println l
+end

@@ -1,0 +1,23 @@
+# should display an ambiguous function call error showing only the functions of the same arity
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  int f(int x, char y) is
+    return 10
+  end
+  int f(int x, char[] y) is
+  return 10
+  end
+  int f(bool x) is
+    return 20 
+  end
+  int x = call f(5, true) ; 
+  println x
+end

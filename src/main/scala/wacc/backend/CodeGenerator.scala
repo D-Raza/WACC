@@ -24,7 +24,7 @@ object CodeGenerator {
 
     implicit val printTable: Map[(Int, Int), Type] = programNode.printTable
     implicit val symbolTable: Map[Ident, Type] = programNode.symbolTable
-    implicit val functionTable: Map[Ident, (Type, List[Type])] =
+    implicit val functionTable: Map[Ident, List[(Type, List[Type])]] =
       programNode.functionTable
     implicit val mainLabels = new Labels("main")
     implicit val ec =
@@ -89,13 +89,31 @@ object CodeGenerator {
       instructions
   }
 
+  private def funcLabel(funcIdent: Ident, argTypes: List[Type]): String = {
+    val argTypesAsStr = argTypes match {
+      case Nil => List("void") // should never happen
+      case _ => {
+        argTypes.map(argType =>
+          argType match {
+            case arr: ArrayType =>
+              arr.labelToString() // array type uses different label string method
+            case pair: PairType =>
+              pair
+                .labelToString() // pair type uses different label string method
+            case _ => argType.toString
+          }
+        )
+      }
+    }
+    "wacc_" + funcIdent.name + "_" + argTypesAsStr.mkString("_")
+  }
+
   def compileFunc(funcNode: Func)(implicit
       state: CodeGenState,
-      functionTable: Map[Ident, (Type, List[Type])]
+      functionTable: Map[Ident, List[(Type, List[Type])]]
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
-    val funcNameLabel = "wacc_" + funcNode.ident.name
-
+    val funcNameLabel = funcLabel(funcNode.ident, funcNode.paramList.map(_.ty))
     val paramsAndRegs = funcNode.paramList zip List(R0, R1, R2, R3)
 
     paramsAndRegs.foreach { case ((Param(_, ident), reg)) =>
@@ -113,7 +131,7 @@ object CodeGenerator {
 
     val sm = new StackMachine()
     sm.addStackFrame(funcNode.symbolTable, funcNode.paramList, true)
-    val funcLabels = new Labels(funcNode.ident.name)
+    val funcLabels = new Labels(funcNameLabel)
     instructions ++= compileStats(funcNode.stats)(
       state,
       sm,
@@ -141,7 +159,7 @@ object CodeGenerator {
       stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
-      functionTable: Map[Ident, (Type, List[Type])],
+      functionTable: Map[Ident, List[(Type, List[Type])]],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -164,7 +182,7 @@ object CodeGenerator {
       stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
-      functionTable: Map[Ident, (Type, List[Type])],
+      functionTable: Map[Ident, List[(Type, List[Type])]],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -415,7 +433,7 @@ object CodeGenerator {
       stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
-      functionTable: Map[Ident, (Type, List[Type])],
+      functionTable: Map[Ident, List[(Type, List[Type])]],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -477,7 +495,7 @@ object CodeGenerator {
       stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
-      functionTable: Map[Ident, (Type, List[Type])],
+      functionTable: Map[Ident, List[(Type, List[Type])]],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -547,7 +565,7 @@ object CodeGenerator {
       stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
-      functionTable: Map[Ident, (Type, List[Type])],
+      functionTable: Map[Ident, List[(Type, List[Type])]],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -605,7 +623,7 @@ object CodeGenerator {
       stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
-      functionTable: Map[Ident, (Type, List[Type])],
+      functionTable: Map[Ident, List[(Type, List[Type])]],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -656,7 +674,7 @@ object CodeGenerator {
       stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
-      functionTable: Map[Ident, (Type, List[Type])],
+      functionTable: Map[Ident, List[(Type, List[Type])]],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -702,7 +720,10 @@ object CodeGenerator {
       }
     }
 
-    instructions += BranchAndLink("wacc_" + funcCallNode.x.name)
+    val argTypes: List[Type] = funcCallNode.argTypes
+    val funcLabelName = funcLabel(funcCallNode.x, argTypes)
+
+    instructions += BranchAndLink(funcLabelName)
     instructions += Move(resReg, R0)
 
     if (numArgs > regsLength) {
@@ -719,7 +740,7 @@ object CodeGenerator {
       stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
-      functionTable: Map[Ident, (Type, List[Type])],
+      functionTable: Map[Ident, List[(Type, List[Type])]],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -1073,7 +1094,7 @@ object CodeGenerator {
       stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
-      functionTable: Map[Ident, (Type, List[Type])],
+      functionTable: Map[Ident, List[(Type, List[Type])]],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
@@ -1193,7 +1214,7 @@ object CodeGenerator {
       stackMachine: StackMachine,
       printTable: Map[(Int, Int), Type],
       symbolTable: Map[Ident, Type],
-      functionTable: Map[Ident, (Type, List[Type])],
+      functionTable: Map[Ident, List[(Type, List[Type])]],
       labels: Labels
   ): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty

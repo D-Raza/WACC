@@ -1,0 +1,15 @@
+# maximum of an int array returns correctly
+
+# Output:
+# 71120
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int[] arr = [71120, 10, 516, 912, -5];
+    int s = call maximum(arr);
+    println s
+end
