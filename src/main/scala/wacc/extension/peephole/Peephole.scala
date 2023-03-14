@@ -10,7 +10,7 @@ object Peephole {
     var instr = instructions
     instr = removeRedundantSubAndAdd()(instr)
     instr = removeRedundantMov()(instr)
-    instr = removeRedundantLoad()(instr)  
+    instr = removeRedundantLoad()(instr)
     instr = replaceMovAddWithAdd()(instr)
     instr = replaceSubLdrWithLdr()(instr)
     instr = removeRedundantStrLdr()(instr)
@@ -27,9 +27,11 @@ object Peephole {
       instructions: mutable.ListBuffer[Instruction]
   ): mutable.ListBuffer[Instruction] = {
     instructions.filter(_ match {
-      case SubInstr(dstReg, srcReg, ImmVal(0), Condition.AL, None) => dstReg.n != srcReg.n
-      case AddInstr(dstReg, srcReg, ImmVal(0), Condition.AL, None) => dstReg.n != srcReg.n
-      case _                                                       => true
+      case SubInstr(dstReg, srcReg, ImmVal(0), Condition.AL, None) =>
+        dstReg.n != srcReg.n
+      case AddInstr(dstReg, srcReg, ImmVal(0), Condition.AL, None) =>
+        dstReg.n != srcReg.n
+      case _ => true
     })
   }
 
@@ -51,8 +53,6 @@ object Peephole {
     })
   }
 
-
-
   /*
    * Replaces instructions of the form:
    * ldr    |a| #x
@@ -62,7 +62,9 @@ object Peephole {
    * ldr    |a| #y
    *
    */
-  def removeRedundantLoad()(implicit instructions: mutable.ListBuffer[Instruction]): mutable.ListBuffer[Instruction] = {
+  def removeRedundantLoad()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): mutable.ListBuffer[Instruction] = {
     val optimisedInstructions = mutable.ListBuffer.empty[Instruction]
     var i = 0
     while (i < instructions.length) {
@@ -71,7 +73,11 @@ object Peephole {
           if (i + 1 < instructions.length) {
             instructions(i + 1) match {
               case Load(dstReg, ImmVal(immVal), Condition.AL) => {
-                optimisedInstructions += Load(dstReg, ImmVal(immVal), Condition.AL)
+                optimisedInstructions += Load(
+                  dstReg,
+                  ImmVal(immVal),
+                  Condition.AL
+                )
                 i += 1
               }
               case _ => optimisedInstructions += instructions(i)
@@ -85,7 +91,6 @@ object Peephole {
     optimisedInstructions
   }
 
-
   /*
    * Replaces instructions of the form:
    * mov     |a|, #|b|
@@ -95,7 +100,9 @@ object Peephole {
    * add     |c|, |d|, #|b| when |a| == |e|
    *
    */
-  def replaceMovAddWithAdd()(implicit instructions: mutable.ListBuffer[Instruction]): mutable.ListBuffer[Instruction] = {
+  def replaceMovAddWithAdd()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): mutable.ListBuffer[Instruction] = {
     val optimisedInstructions = mutable.ListBuffer.empty[Instruction]
     var i = 0
     while (i < instructions.length) {
@@ -103,14 +110,23 @@ object Peephole {
         case Move(dstReg, ImmVal(immVal), Condition.AL) => {
           if (i + 1 < instructions.length) {
             instructions(i + 1) match {
-              case AddInstr(dstReg2, operand1, operand2, Condition.AL, None) => {
+              case AddInstr(
+                    dstReg2,
+                    operand1,
+                    operand2,
+                    Condition.AL,
+                    None
+                  ) => {
                 operand2 match {
                   case reg: Register => {
                     if (dstReg.n == reg.n) {
-                        optimisedInstructions += AddInstr(dstReg2, operand1, ImmVal(immVal))
-                        i += 1
-                    } 
-                    else optimisedInstructions += instructions(i)
+                      optimisedInstructions += AddInstr(
+                        dstReg2,
+                        operand1,
+                        ImmVal(immVal)
+                      )
+                      i += 1
+                    } else optimisedInstructions += instructions(i)
                   }
                   case _ => optimisedInstructions += instructions(i)
                 }
@@ -135,7 +151,9 @@ object Peephole {
    * ldr     |d|, [|b|, #-|c|] when |a| == |e|
    *
    */
-  def replaceSubLdrWithLdr()(implicit instructions: mutable.ListBuffer[Instruction]): mutable.ListBuffer[Instruction]= {
+  def replaceSubLdrWithLdr()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): mutable.ListBuffer[Instruction] = {
     val optimisedInstructions = mutable.ListBuffer.empty[Instruction]
     var i = 0
     while (i < instructions.length) {
@@ -143,14 +161,20 @@ object Peephole {
         case SubInstr(dstReg, operand2, ImmVal(immVal), Condition.AL, None) => {
           if (i + 1 < instructions.length) {
             instructions(i + 1) match {
-              case Load(dstReg2, OffsetMode(_dstReg, None, None, ImmVal(0)), Condition.AL) => {
+              case Load(
+                    dstReg2,
+                    OffsetMode(_dstReg, None, None, ImmVal(0)),
+                    Condition.AL
+                  ) => {
                 operand2 match {
                   case _: Register => {
                     if (dstReg.n == _dstReg.n) {
-                      optimisedInstructions += Load(dstReg2, OffsetMode(operand2, shiftAmount = ImmVal(-immVal)))
+                      optimisedInstructions += Load(
+                        dstReg2,
+                        OffsetMode(operand2, shiftAmount = ImmVal(-immVal))
+                      )
                       i += 1
-                    } 
-                    else optimisedInstructions += instructions(i)
+                    } else optimisedInstructions += instructions(i)
                   }
                   case _ => optimisedInstructions += instructions(i)
                 }
@@ -166,8 +190,6 @@ object Peephole {
     optimisedInstructions
   }
 
-
-
   /*
    * Removes redundant instructions in:
    * str     |a|, |b|
@@ -179,7 +201,9 @@ object Peephole {
    *
    */
 
-  def removeRedundantStrLdr()(implicit instructions: mutable.ListBuffer[Instruction]): mutable.ListBuffer[Instruction] = {
+  def removeRedundantStrLdr()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): mutable.ListBuffer[Instruction] = {
     val optimisedInstructions = mutable.ListBuffer.empty[Instruction]
     var i = 0
     while (i < instructions.length) {
@@ -191,13 +215,12 @@ object Peephole {
                 if (srcReg.n == dstReg.n && operand2 == operand2_) {
                   optimisedInstructions += instructions(i)
                   i += 1
-                }
-                else optimisedInstructions += instructions(i)
+                } else optimisedInstructions += instructions(i)
               }
               case _ => optimisedInstructions += instructions(i)
             }
           }
-        } 
+        }
         case Load(dstReg, operand2, Condition.AL) => {
           if (i + 1 < instructions.length) {
             instructions(i + 1) match {
@@ -205,8 +228,7 @@ object Peephole {
                 if (srcReg.n == dstReg.n && operand2 == operand2_) {
                   optimisedInstructions += instructions(i)
                   i += 1
-                }
-                else optimisedInstructions += instructions(i)
+                } else optimisedInstructions += instructions(i)
               }
               case _ => optimisedInstructions += instructions(i)
             }
@@ -224,12 +246,14 @@ object Peephole {
    * push {regs}
    * mov |a|, |b|
    * pop {regs}
-   * 
+   *
    * with:
    * mov |a|, |b| when |a|, |b| not in regs
    *
    */
-  def replacePushMovPopWithMov()(implicit instructions: mutable.ListBuffer[Instruction]): mutable.ListBuffer[Instruction] = {
+  def replacePushMovPopWithMov()(implicit
+      instructions: mutable.ListBuffer[Instruction]
+  ): mutable.ListBuffer[Instruction] = {
     val replacedInstructions = mutable.ListBuffer.empty[Instruction]
     var i = 0
     while (i < instructions.length) {
@@ -243,7 +267,11 @@ object Peephole {
                     case Pop(regs_, Condition.AL) => {
                       operand match {
                         case _: Register /*| _: ImmChar | _: ImmVal */ => {
-                          if (!regs.contains(srcReg) && !regs.contains(operand) && regs.equals(regs_)) {
+                          if (
+                            !regs.contains(srcReg) && !regs.contains(
+                              operand
+                            ) && regs.equals(regs_)
+                          ) {
                             replacedInstructions += Move(srcReg, operand)
                             i += 2
                           } else {
@@ -255,9 +283,8 @@ object Peephole {
                           if (!regs.contains(srcReg) && regs.equals(regs_)) {
                             replacedInstructions += Move(srcReg, operand)
                             i += 2
-                          } 
-                          else replacedInstructions += instructions(i)
-                          
+                          } else replacedInstructions += instructions(i)
+
                         }
 
                         case _ => replacedInstructions += instructions(i)
@@ -268,18 +295,18 @@ object Peephole {
                 }
               }
               case _ => replacedInstructions += instructions(i)
-              
+
             }
           }
         }
         case _ => replacedInstructions += instructions(i)
-        
+
       }
       i += 1
     }
     replacedInstructions
   }
-   // def replacePushMovPopWithMov()(implicit
+  // def replacePushMovPopWithMov()(implicit
   //     instructions: mutable.ListBuffer[Instruction]
   // ): mutable.ListBuffer[Instruction] = {
   //   val patternLength = 3
@@ -294,10 +321,10 @@ object Peephole {
   //               } else {
   //                 mutable.ListBuffer(Push(regs), Move(srcReg, operand), Pop(regs))
   //               }
-  //             } 
+  //             }
   //           }
   //       }
-  //       case x => x 
+  //       case x => x
   //     }
   //     .foldLeft(mutable.ListBuffer.empty[Instruction])((acc, instr) => acc += instr)
   // }

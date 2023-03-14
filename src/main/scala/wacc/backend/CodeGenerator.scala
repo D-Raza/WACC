@@ -9,7 +9,7 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Await
 import scala.concurrent.duration._
-// import wacc.extension.peephole.Peephole
+import wacc.extension.peephole.Peephole
 
 object CodeGenerator {
 
@@ -17,7 +17,8 @@ object CodeGenerator {
 
   def compileProgram(
       programNode: Program,
-      parallel: Boolean = false
+      parallel: Boolean = false,
+      optimize: Boolean = false
   )(implicit state: CodeGenState): mutable.ListBuffer[Instruction] = {
     val instructions: mutable.ListBuffer[Instruction] = mutable.ListBuffer.empty
 
@@ -82,9 +83,10 @@ object CodeGenerator {
 
     mainLabels.addLabelInstructions(instructions)
 
-    // Peephole.peephole()(instructions)
-
-    instructions
+    if (optimize)
+      Peephole.peephole()(instructions)
+    else
+      instructions
   }
 
   def compileFunc(funcNode: Func)(implicit
