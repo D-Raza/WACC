@@ -1,0 +1,15 @@
+# signum of a number is correct
+
+# Output:
+# 1
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int x = 5;
+    int x_sign = call signum(x);
+    println x_sign 
+end

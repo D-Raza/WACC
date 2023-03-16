@@ -1,0 +1,14 @@
+# 7P(-1) = 0 
+
+# Output:
+# 0
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int c = call permute(7, -1) ;
+    println c
+end

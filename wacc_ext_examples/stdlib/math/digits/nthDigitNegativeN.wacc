@@ -1,0 +1,14 @@
+# nth Digit of a negative number is -1
+
+# Output:
+# -1
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int minus_one = call nthDigit(10, -3) ; 
+    println minus_one
+end

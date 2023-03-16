@@ -1,0 +1,14 @@
+# 7C3 = 35
+
+# Output:
+# 35
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int c = call choose(7, 3);
+    println c
+end

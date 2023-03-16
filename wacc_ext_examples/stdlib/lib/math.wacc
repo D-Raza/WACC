@@ -157,5 +157,90 @@ begin
         return res
     end
 
+
+    # Computes the signum function of a number. (1 if positive, -1 if negative, 0 if zero)
+    # @param x the number
+    # @return the signum function of x
+    int signum(int x) is 
+        if (x > 0) then 
+            return 1
+        else 
+            if (x < 0) then 
+                 return -1
+            else 
+                return 0
+            fi
+        fi
+    end
+
+    # Returns the number of digits in a number.
+    # @param x the number
+    # @return the number of digits in x
+    int numDigits(int x) is 
+        if (x == 0) then 
+            return 1
+        else 
+            int abs_x = call abs(x) ;
+            int num_digits = 0 ; 
+            while (abs_x != 0) do 
+                abs_x = abs_x / 10 ; 
+                num_digits = num_digits + 1
+                done ; 
+            return num_digits
+        fi
+    end
+
+    # Returns the nth digit of a number. (-1 if n is greater than the number of digits in x, or if n negative)
+    # @param x the number
+    # @param n the digit
+    # @return the nth digit of x
+    int nthDigit(int x, int n) is 
+        int abs_x = call abs(x) ; 
+        int num_digits = call numDigits(abs_x) ;
+        if (n > num_digits || n <= 0) then 
+            return -1
+        else
+            int i = 0 ;
+            int digit = 0 ;
+            while (i != n) do 
+                digit = abs_x % 10 ;
+                abs_x = abs_x / 10 ;
+                i = i + 1
+            done ;
+            return digit
+        fi
+    end
+
+    # Returns the number of ways to choose k items from n items without reptition and without order.
+    # Equivalent to n! / (k! * (n - k)!) when k <= n, and 0 otherwise.
+    # @param n the number of items
+    # @param k the number of items to choose
+    # @return the number of ways to choose k items from n items without order and without repetition
+    int choose(int n, int k) is
+        if (k > n || k < 0 || n < 0) then
+            return 0
+        else
+            int n_fact = call factorial(n);
+            int k_fact = call factorial(k);
+            int n_minus_k_fact = call factorial(n - k);
+            return n_fact / (k_fact * n_minus_k_fact)
+        fi
+    end
+
+    # Returns the number of ways to choose k items from n items without reptition and with order.
+    # Equivalent to n! / (n - k)! when k <= n, and 0 otherwise.
+    # @param n the number of items
+    # @param k the number of items to choose
+    # @return the number of ways to choose k items from n items with order and without repetition
+    int permute(int n, int k) is
+        if (k > n || k < 0 || n < 0) then
+            return 0
+        else
+            int n_fact = call factorial(n);
+            int n_minus_k_fact = call factorial(n - k);
+            return n_fact / n_minus_k_fact
+        fi
+    end
+
     skip
 end

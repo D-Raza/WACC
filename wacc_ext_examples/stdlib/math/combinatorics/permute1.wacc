@@ -1,0 +1,14 @@
+# 10P3 = 720 
+
+# Output:
+# 720
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int c = call permute(10, 3) ; 
+    println c
+end

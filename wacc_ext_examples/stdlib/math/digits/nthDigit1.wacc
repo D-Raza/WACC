@@ -1,0 +1,14 @@
+# nth Digit returns the nth digit of a number.
+
+# Output:
+# 4
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int four = call nthDigit(1234567, 4);
+    println four
+end

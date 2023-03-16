@@ -1,0 +1,14 @@
+# numDigits returns the number of the digits in a number
+
+# Output:
+# 1
+#
+
+# Program:
+
+import "../../stdlib.wacc"
+
+begin
+    int one = call numDigits(0) ; 
+    println one
+end
