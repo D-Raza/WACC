@@ -28,18 +28,23 @@ object SemanticAnalyser {
     program match {
       case Program(funcs, stats) =>
         funcs.foreach(func => {
-          if (functionTableWithOverloading contains func.ident)
-            if (
-              functionTableWithOverloading(func.ident)
-                .contains((func.ty, func.paramList.map(_.ty)))
-            ) {
+          if (functionTableWithOverloading contains func.ident) {
+
+            // parameter types of the function 
+            val paramTypes = func.paramList.map(_.ty)
+
+            // checks if the function has been defined with the same parameter types 
+            if (functionTableWithOverloading(func.ident).exists(_._2 == paramTypes)) {
               errors += RedefinedFunctionError.genError(func.ident)
-            } else {
+            }
+
+            else {
               // functionTableWithOverloading.updated(func.ident, functionTableWithOverloading(func.ident) ++ List((func.ty, func.paramList.map(_.ty))))
               functionTableWithOverloading += (func.ident -> (functionTableWithOverloading(
                 func.ident
               ) ++ List((func.ty, func.paramList.map(_.ty)))))
             }
+          }
           else {
             // functionTableWithOverloading.updated(func.ident, List((func.ty, func.paramList.map(_.ty))))
             functionTableWithOverloading += (func.ident -> List(

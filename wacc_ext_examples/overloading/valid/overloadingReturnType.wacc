@@ -1,0 +1,24 @@
+# overloading function 
+
+# Output:
+# 100
+# a
+# 
+
+# Exit:
+# 0
+
+# Program:
+
+begin
+  char f(bool x) is
+    return 'a'
+	end
+  int f(int x) is
+    return 100
+  end
+  int i = call f(1) ;
+  println i ; 
+  char c = call f(true) ;
+  println c 
+end

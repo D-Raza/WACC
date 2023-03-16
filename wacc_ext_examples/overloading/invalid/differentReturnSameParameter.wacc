@@ -1,0 +1,19 @@
+# Attempting to overload a function with same parameter types, but different return types.
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  int f(int i) is
+    return 10
+  end
+  char f(int i) is
+    return 'a'
+  end 
+  int x = 10
+end
