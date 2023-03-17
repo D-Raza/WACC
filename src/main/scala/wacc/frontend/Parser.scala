@@ -19,6 +19,7 @@ object Parser {
   implicit val waccErrorBuilder: WACCErrorBuilder =
     new WACCErrorBuilder
 
+  /* <source-file> ::= (<import>)* <program> */
   private lazy val `<source-file>` = fully(
     SourceFile(many(`<import>`), `<program>`)
   )
